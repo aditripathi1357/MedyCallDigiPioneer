@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "751442947200",
+    "project_id": "medycall-5b3be",
+    "storage_bucket": "medycall-5b3be.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:751442947200:android:8aabe684d0e0d08ea54a65",
+        "android_client_info": {
+          "package_name": "com.example.medycall"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCakaXhMk3WhfQQKyOG5azhOskiIn0ejo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
