@@ -9,8 +9,10 @@ import 'package:medycall/home/more.dart';
 import 'package:medycall/home/menu/menu.dart';
 import 'package:medycall/Appointment/appointment.dart';
 import 'package:medycall/home/profile/profile.dart';
+//import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/History/history.dart';
 import 'package:medycall/home/Speciality/SpecialtyDoctors.dart';
+import 'package:medycall/home/notification/messages.dart';
 
 // Custom painter for polygon background
 class PolygonPainter extends CustomPainter {
@@ -91,6 +93,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Add this field to your _HomeScreenState class
+  int? _selectedTopBarIconIndex;
+
+  // Define the theme color constant
+  final Color themeColor = const Color(0xFF008D83);
+
   Widget _buildTopBar(String userName) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -123,15 +131,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 3),
-                    GestureDetector(
+                    _buildIcon(
+                      assetPath: 'assets/homescreen/pencil.png',
+                      index: 0,
                       onTap: () {
                         // Handle image tap
                       },
-                      child: Image.asset(
-                        'assets/homescreen/pencil.png',
-                        width: 30,
-                        height: 30,
-                      ),
                     ),
                   ],
                 ),
@@ -141,35 +146,78 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         Row(
           children: [
-            const SizedBox(width: 3),
-            GestureDetector(
+            _buildIcon(
+              assetPath: 'assets/homescreen/notification.png',
+              index: 1,
               onTap: () {
-                // Handle image tap
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MessagesScreen(),
+                  ),
+                );
               },
-              child: Image.asset(
-                'assets/homescreen/notification.png',
-                width: 30,
-                height: 30,
-              ),
             ),
-            const SizedBox(width: 3),
-            const SizedBox(width: 3),
+            const SizedBox(width: 8),
             Builder(
               builder:
-                  (context) => GestureDetector(
+                  (context) => _buildIcon(
+                    assetPath: 'assets/homescreen/menu.png',
+                    index: 2,
                     onTap: () {
                       Scaffold.of(context).openDrawer();
                     },
-                    child: Image.asset(
-                      'assets/homescreen/menu.png',
-                      width: 30,
-                      height: 30,
-                    ),
                   ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  // Add this helper method to your _HomeScreenState class
+  Widget _buildIcon({
+    required String assetPath,
+    required int index,
+    required VoidCallback onTap,
+  }) {
+    final bool isSelected = _selectedTopBarIconIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          // Set this icon as selected, but only temporarily
+          _selectedTopBarIconIndex = index;
+        });
+
+        // Clear selection after a short delay (visual feedback)
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _selectedTopBarIconIndex = null;
+            });
+          }
+        });
+
+        // Execute the original onTap action
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? const Color(0xFF37847E).withOpacity(0.1)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Image.asset(
+          assetPath,
+          width: 30,
+          height: 30,
+          color: isSelected ? const Color(0xFF37847E) : null,
+        ),
+      ),
     );
   }
 

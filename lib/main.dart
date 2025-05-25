@@ -5,7 +5,7 @@ import 'package:medycall/firebase_options.dart';
 import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/providers/user_provider.dart';
 import 'package:provider/provider.dart';
-//import 'package:medycall/splashscreen.dart';
+import 'package:medycall/splashscreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const supabaseUrl = 'https://caeavcnufqmiosagnwlz.supabase.co';
@@ -45,7 +45,7 @@ class MedyCallApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey[50],
       ),
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }

@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/services/user_service.dart';
+import 'package:medycall/models/user_model.dart';
+import 'package:provider/provider.dart';
+import 'package:medycall/providers/user_provider.dart';
 
 class MedicalInfoScreen extends StatefulWidget {
+  const MedicalInfoScreen({super.key});
+
   @override
-  _MedicalInfoScreenState createState() => _MedicalInfoScreenState();
+  State<MedicalInfoScreen> createState() => _MedicalInfoScreenState();
 }
 
 class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
-  int _selectedIndex = 2; // NIROG is selected by default
+  int _selectedIndex = 4; // Profile is selected
+  final UserService _userService = UserService();
+  bool _isLoading = false;
 
   // Medical data state
   List<String> allergies = [];
@@ -25,7 +32,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   final TextEditingController injuriesController = TextEditingController();
   final TextEditingController surgeriesController = TextEditingController();
 
-  // Focus nodes to maintain focus after adding tags
+  // Focus nodes
   final FocusNode allergiesFocus = FocusNode();
   final FocusNode medicationsFocus = FocusNode();
   final FocusNode chronicDiseasesFocus = FocusNode();
@@ -33,8 +40,16 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   final FocusNode surgeriesFocus = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    // Ensure context is available for Provider.of
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadExistingData();
+    });
+  }
+
+  @override
   void dispose() {
-    // Dispose controllers and focus nodes
     allergiesController.dispose();
     medicationsController.dispose();
     chronicDiseasesController.dispose();
@@ -46,25 +61,204 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
     chronicDiseasesFocus.dispose();
     injuriesFocus.dispose();
     surgeriesFocus.dispose();
-
     super.dispose();
+  }
+
+  void _populateFieldsFromData(Map<String, dynamic> data) {
+    setState(() {
+      allergies = List<String>.from(data['allergies'] ?? []);
+      medications = List<String>.from(data['medications'] ?? []);
+      chronicDiseases = List<String>.from(data['chronicDiseases'] ?? []);
+      injuries = List<String>.from(data['injuries'] ?? []);
+      surgeries = List<String>.from(data['surgeries'] ?? []);
+    });
+  }
+
+  Future<void> _loadExistingData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      // Priority 1: UserProvider
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      UserModel? providerUser = userProvider.user;
+      Map<String, dynamic>? providerMedicalData;
+
+      if (providerUser != null &&
+          providerUser.supabaseUid != null &&
+          providerUser.name != null &&
+          providerUser.name!.isNotEmpty) {
+        // Basic check
+        providerMedicalData = providerUser.getMedicalData();
+      }
+
+      if (providerMedicalData != null && providerMedicalData.isNotEmpty) {
+        print('MedicalInfoScreen: Loading data from UserProvider');
+        _populateFieldsFromData(providerMedicalData);
+      } else {
+        // Priority 2: Local Storage
+        print(
+          'MedicalInfoScreen: UserProvider data not found or incomplete, trying local storage.',
+        );
+        final localData = await _userService.getLocalMedicalData();
+        if (localData != null && mounted) {
+          print('MedicalInfoScreen: Loading data from Local Storage');
+          _populateFieldsFromData(localData);
+        } else {
+          print(
+            'MedicalInfoScreen: No data in UserProvider or Local Storage. Using defaults (empty lists).',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        print(
+          'MedicalInfoScreen: Error loading existing data: ${e.toString()}',
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading medical data: ${e.toString()}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _submitData() async {
+    setState(() => _isLoading = true);
+
+    try {
+      _addTagFromController(allergiesController, allergies, allergiesFocus);
+      _addTagFromController(
+        medicationsController,
+        medications,
+        medicationsFocus,
+      );
+      _addTagFromController(
+        chronicDiseasesController,
+        chronicDiseases,
+        chronicDiseasesFocus,
+      );
+      _addTagFromController(injuriesController, injuries, injuriesFocus);
+      _addTagFromController(surgeriesController, surgeries, surgeriesFocus);
+
+      await _userService.saveMedicalDataLocally(
+        allergies: allergies.isNotEmpty ? allergies : null,
+        medications: medications.isNotEmpty ? medications : null,
+        chronicDiseases: chronicDiseases.isNotEmpty ? chronicDiseases : null,
+        injuries: injuries.isNotEmpty ? injuries : null,
+        surgeries: surgeries.isNotEmpty ? surgeries : null,
+      );
+
+      final UserModel? submittedUser = await _userService.submitAllFormsData();
+
+      if (submittedUser != null && mounted) {
+        Provider.of<UserProvider>(
+          context,
+          listen: false,
+        ).setUser(submittedUser);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All profile data submitted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else if (mounted) {
+        throw Exception(
+          'Failed to submit all forms data or user data not returned.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Submission failed: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _skipAndSubmit() async {
+    setState(() => _isLoading = true);
+    try {
+      await _userService.saveMedicalDataLocally(
+        allergies: [], // Explicitly save as empty for skip
+        medications: [],
+        chronicDiseases: [],
+        injuries: [],
+        surgeries: [],
+      );
+
+      final UserModel? submittedUser = await _userService.submitAllFormsData();
+
+      if (submittedUser != null && mounted) {
+        Provider.of<UserProvider>(
+          context,
+          listen: false,
+        ).setUser(submittedUser);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Profile data (with skipped medical info) submitted.',
+            ),
+            backgroundColor: Colors.blueAccent,
+          ),
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else if (mounted) {
+        throw Exception(
+          'Failed to submit forms data after skipping or user data not returned.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Submission after skipping failed: ${e.toString()}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // More robust loading check
+    bool isStillInitializing =
+        _isLoading &&
+        allergies.isEmpty &&
+        medications.isEmpty &&
+        chronicDiseases.isEmpty &&
+        injuries.isEmpty &&
+        surgeries.isEmpty &&
+        allergiesController.text.isEmpty;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF008D83), // Header color
+      backgroundColor: const Color(0xFF008D83),
       body: Column(
         children: [
           SizedBox(
-            width: 393,
+            width: double.infinity,
             height: 133,
             child: Padding(
-              padding: const EdgeInsets.only(top: 50, left: 20),
+              padding: const EdgeInsets.only(top: 50, left: 20, right: 20),
               child: Align(
                 alignment: Alignment.topLeft,
                 child: Text(
-                  'Medical',
+                  'Medical Information',
                   style: GoogleFonts.roboto(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -74,11 +268,9 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
               ),
             ),
           ),
-
-          // White card
           Expanded(
             child: Container(
-              width: MediaQuery.of(context).size.width,
+              width: double.infinity,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.only(
@@ -86,80 +278,150 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                   topRight: Radius.circular(28),
                 ),
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 30,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHorizontalTagInput(
-                      'Allergies',
-                      allergies,
-                      allergiesController,
-                      allergiesFocus,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildHorizontalTagInput(
-                      'Medication',
-                      medications,
-                      medicationsController,
-                      medicationsFocus,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildHorizontalTagInput(
-                      'Chronic Disease',
-                      chronicDiseases,
-                      chronicDiseasesController,
-                      chronicDiseasesFocus,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildHorizontalTagInput(
-                      'Injuries',
-                      injuries,
-                      injuriesController,
-                      injuriesFocus,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildHorizontalTagInput(
-                      'Surgeries',
-                      surgeries,
-                      surgeriesController,
-                      surgeriesFocus,
-                    ),
-                    const SizedBox(height: 40),
-                    // Submit button
-                    Center(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Process any remaining text in controllers before saving
-                          _addRemainingTextAsTags();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF008D83),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          minimumSize: const Size(150, 50),
+              child:
+                  isStillInitializing
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 30,
                         ),
-                        child: Text(
-                          'Submit',
-                          style: GoogleFonts.roboto(
-                            fontWeight: FontWeight.w900,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                children: [
+                                  _buildProgressSegment(
+                                    isActive: true,
+                                  ), // Demographic
+                                  const SizedBox(width: 8),
+                                  _buildProgressSegment(
+                                    isActive: true,
+                                  ), // Lifestyle
+                                  const SizedBox(width: 8),
+                                  _buildProgressSegment(
+                                    isActive: true,
+                                  ), // Medical (Current)
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _buildHorizontalTagInput(
+                              'Allergies (Optional)',
+                              allergies,
+                              allergiesController,
+                              allergiesFocus,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildHorizontalTagInput(
+                              'Current Medications (Optional)',
+                              medications,
+                              medicationsController,
+                              medicationsFocus,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildHorizontalTagInput(
+                              'Chronic Diseases (Optional)',
+                              chronicDiseases,
+                              chronicDiseasesController,
+                              chronicDiseasesFocus,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildHorizontalTagInput(
+                              'Past Injuries (Optional)',
+                              injuries,
+                              injuriesController,
+                              injuriesFocus,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildHorizontalTagInput(
+                              'Past Surgeries (Optional)',
+                              surgeries,
+                              surgeriesController,
+                              surgeriesFocus,
+                            ),
+                            const SizedBox(height: 40),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed:
+                                        _isLoading ? null : _skipAndSubmit,
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: Color(0xFF008D83),
+                                      ),
+                                      foregroundColor: const Color(0xFF008D83),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      minimumSize: const Size(0, 50),
+                                    ),
+                                    child: Text(
+                                      'Skip & Submit',
+                                      style: GoogleFonts.roboto(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _submitData,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF008D83),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      minimumSize: const Size(0, 50),
+                                    ),
+                                    child:
+                                        _isLoading
+                                            ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.white),
+                                              ),
+                                            )
+                                            : Text(
+                                              'Submit All Data',
+                                              style: GoogleFonts.roboto(
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildProgressSegment({required bool isActive}) {
+    return Container(
+      width: 30,
+      height: 4,
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFF008D83) : Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(2),
+      ),
     );
   }
 
@@ -174,75 +436,64 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       children: [
         Text(
           title,
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            color: Colors.grey,
-            fontSize: 14,
+          style: GoogleFonts.roboto(
+            color: Colors.black54,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+            border: Border.all(color: Colors.grey.shade400),
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Row(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Expand the wrap and text field horizontally
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    // Display all existing tags
-                    ...tagList.map((tag) {
-                      return Chip(
-                        label: Text(tag),
-                        backgroundColor: Color(0xFFE0F2F1), // Light green color
-                        deleteIconColor: Colors.grey[600],
-                        onDeleted: () {
-                          setState(() {
-                            tagList.remove(tag);
-                          });
-                        },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        labelPadding: EdgeInsets.symmetric(horizontal: 4),
-                        padding: EdgeInsets.all(0),
-                      );
-                    }).toList(),
-
-                    // Add inline text field that grows with content
-                    IntrinsicWidth(
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          hintText:
-                              tagList.isEmpty
-                                  ? 'Add ${title.toLowerCase()}'
-                                  : '',
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 4,
-                          ),
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (value) {
-                          if (value.trim().isNotEmpty) {
-                            setState(() {
-                              tagList.add(value.trim());
-                              controller.clear();
-                              // Keep focus on the text field after adding a tag
-                              focusNode.requestFocus();
-                            });
-                          }
-                        },
+              ...tagList.map((tag) {
+                return Chip(
+                  label: Text(
+                    tag,
+                    style: GoogleFonts.roboto(color: Colors.teal.shade900),
+                  ),
+                  backgroundColor: Colors.teal.shade50,
+                  deleteIconColor: Colors.teal.shade700,
+                  onDeleted: () => setState(() => tagList.remove(tag)),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                );
+              }).toList(),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 150),
+                child: IntrinsicWidth(
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    style: GoogleFonts.roboto(),
+                    decoration: InputDecoration(
+                      hintText:
+                          tagList.isEmpty
+                              ? 'Type and press Enter...'
+                              : 'Add more...',
+                      hintStyle: GoogleFonts.roboto(
+                        color: Colors.grey.shade500,
                       ),
+                      isDense: true,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
-                  ],
+                    onSubmitted: (value) {
+                      _addTagFromController(controller, tagList, focusNode);
+                    },
+                  ),
                 ),
               ),
             ],
@@ -252,24 +503,22 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
     );
   }
 
-  void _addRemainingTextAsTags() {
-    setState(() {
-      // Add any remaining text in controllers as tags
-      _addTagFromController(allergiesController, allergies);
-      _addTagFromController(medicationsController, medications);
-      _addTagFromController(chronicDiseasesController, chronicDiseases);
-      _addTagFromController(injuriesController, injuries);
-      _addTagFromController(surgeriesController, surgeries);
-    });
-  }
-
   void _addTagFromController(
     TextEditingController controller,
     List<String> tagList,
+    FocusNode focusNode,
   ) {
     if (controller.text.trim().isNotEmpty) {
-      tagList.add(controller.text.trim());
-      controller.clear();
+      setState(() {
+        if (!tagList.contains(controller.text.trim())) {
+          // Avoid duplicate tags
+          tagList.add(controller.text.trim());
+        }
+        controller.clear();
+        focusNode.requestFocus();
+      });
+    } else {
+      focusNode.requestFocus();
     }
   }
 
@@ -319,8 +568,8 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                 ),
                 label: 'Appointment',
               ),
-              BottomNavigationBarItem(
-                icon: const SizedBox(width: 24, height: 24),
+              const BottomNavigationBarItem(
+                icon: SizedBox(width: 24, height: 24),
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
@@ -353,46 +602,30 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
             unselectedItemColor: Colors.grey,
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
-            selectedLabelStyle: TextStyle(
-              fontFamily: 'Roboto',
+            selectedLabelStyle: GoogleFonts.poppins(
               fontSize: 13.8,
               fontWeight: FontWeight.w400,
             ),
-            unselectedLabelStyle: TextStyle(
-              fontFamily: 'Roboto',
+            unselectedLabelStyle: GoogleFonts.poppins(
               fontSize: 13.8,
               fontWeight: FontWeight.w400,
             ),
             onTap: (index) {
               if (index != 2) {
-                setState(() {
-                  _selectedIndex = index;
-                });
+                setState(() => _selectedIndex = index);
               }
             },
           ),
         ),
         Positioned(
           top: -20,
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  print('NIROG tapped');
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  child: Image.asset(
-                    'assets/homescreen/nirog.png',
-                    width: 51,
-                    height: 54,
-                  ),
-                ),
-              ),
-            ],
+          child: GestureDetector(
+            onTap: () => print('NIROG tapped from Medical Screen'),
+            child: Image.asset(
+              'assets/homescreen/nirog.png',
+              width: 51,
+              height: 54,
+            ),
           ),
         ),
       ],

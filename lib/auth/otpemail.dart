@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// ignore: depend_on_referenced_packages
 import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
 import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/models/user_model.dart';
 import 'package:medycall/providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OtpEmail extends StatefulWidget {
   final String email;
-  final String name; // Added name parameter
+  final String name;
 
   const OtpEmail({super.key, required this.email, required this.name});
 
@@ -46,9 +46,22 @@ class _OtpEmailState extends State<OtpEmail> {
       );
 
       if (response.session != null) {
-        // Ensure user data is stored in the provider
+        // Store the authentication token
+        await _storeAuthToken(response.session!.accessToken);
+
+        // Store user data in the provider with token
         final userProvider = Provider.of<UserProvider>(context, listen: false);
-        userProvider.setUser(UserModel(name: widget.name, email: widget.email));
+
+        // Create user model with additional data from Supabase
+        final user = UserModel(
+          name: widget.name,
+          email: widget.email,
+          // Add Supabase user ID if available
+          id: response.user?.id,
+        );
+
+        userProvider.setUser(user);
+        userProvider.setAuthToken(response.session!.accessToken);
 
         // Navigate to home screen
         if (mounted) {
@@ -72,6 +85,11 @@ class _OtpEmailState extends State<OtpEmail> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _storeAuthToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
   }
 
   @override
