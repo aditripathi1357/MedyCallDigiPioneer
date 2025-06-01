@@ -50,12 +50,37 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	
-	<!-- New permission keys for camera, photo library, and documents -->
+	<!-- Camera permission -->
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to take photos for medical analysis</string>
+	<string>Medycall needs camera access to take photos for profile picture and medical analysis.</string>
+	
+	<!-- Photo Library permissions for iOS 14+ -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs photo library access to select images for medical analysis</string>
+	<string>Medycall needs photo library access to select images for profile picture and medical analysis.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Medycall needs permission to save photos to your photo library.</string>
+	
+	<!-- Microphone permission (if needed for video recording) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Medycall needs microphone access for video recording during medical consultations.</string>
+	
+	<!-- Documents and file access -->
 	<key>NSDocumentsFolderUsageDescription</key>
-	<string>This app needs access to documents to select medical reports</string>
+	<string>Medycall needs access to documents to select and save medical reports and files.</string>
+	
+	<!-- Additional keys for better compatibility -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	
+	<!-- Network usage for medical data -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

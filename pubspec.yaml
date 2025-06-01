@@ -51,6 +51,12 @@ dependencies:
   provider: ^6.0.5
   flutter_otp_text_field: ^1.5.1+1
   file_picker: ^8.1.2
+  fl_chart: ^0.68.0 # Or latest version
+  camera: ^0.11.0+1    # Use latest version
+  video_player: ^2.9.1 # Use latest version
+  device_info_plus: ^9.1.0
+ 
+
 
 dev_dependencies:
   flutter_test:
@@ -90,7 +96,7 @@ flutter:
     - assets/ladiesdoctor.png
     - assets/barcode.png
     - assets/success.png
-    - assets/waterdoctor.png
+    
 
     # HomeScreen assets
     - assets/homescreen/pencil.png
@@ -122,6 +128,15 @@ flutter:
     - assets/menu/Fingerprint.png
     - assets/menu/menu_logout.svg
     - assets/menu/fingerprintset.png
+    - assets/menu/waterdoctor.png
+    - assets/menu/emptyglass.png
+    - assets/menu/filledglass.png
+    - assets/menu/filledglass.svg
+    - assets/menu/emptyglass.svg
+    - assets/menu/yogateacher.png
+    - assets/menu/dietdoctor.png
+    
+
     # Specialty icons
     - assets/specialties/general.png
     - assets/specialties/neurologist.png

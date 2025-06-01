@@ -1,3 +1,5 @@
+import 'package:medycall/models/address_model.dart'; // Make sure this path is correct
+
 class UserModel {
   // Basic user info
   final String? id;
@@ -33,6 +35,9 @@ class UserModel {
   final List<String> injuries;
   final List<String> surgeries;
 
+  // Addresses
+  final List<AddressModel> addresses; // Added addresses field
+
   UserModel({
     this.id,
     required this.email,
@@ -63,6 +68,7 @@ class UserModel {
     this.chronicDiseases = const [],
     this.injuries = const [],
     this.surgeries = const [],
+    this.addresses = const [], // Initialize addresses
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -71,19 +77,25 @@ class UserModel {
       email: json['email'] ?? '',
       phone: json['phone'],
       createdAt:
-          json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+          json['createdAt'] != null
+              ? DateTime.tryParse(json['createdAt'])
+              : null,
       updatedAt:
-          json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+          json['updatedAt'] != null
+              ? DateTime.tryParse(json['updatedAt'])
+              : null,
       supabaseUid: json['supabaseUid'],
       // Demographic data
       title: json['title'],
       name: json['name'],
       birthDate:
-          json['birthDate'] != null ? DateTime.parse(json['birthDate']) : null,
+          json['birthDate'] != null
+              ? DateTime.tryParse(json['birthDate'])
+              : null,
       gender: json['gender'],
       bloodGroup: json['bloodGroup'],
-      height: json['height'],
-      weight: json['weight'],
+      height: json['height'] as int?, // Added 'as int?' for type safety
+      weight: json['weight'] as int?, // Added 'as int?' for type safety
       maritalStatus: json['maritalStatus'],
       contactNumber: json['contactNumber'],
       alternateNumber: json['alternateNumber'],
@@ -108,6 +120,15 @@ class UserModel {
           json['injuries'] != null ? List<String>.from(json['injuries']) : [],
       surgeries:
           json['surgeries'] != null ? List<String>.from(json['surgeries']) : [],
+      // Parse addresses
+      addresses:
+          (json['addresses'] as List<dynamic>?)
+              ?.map(
+                (addressJson) =>
+                    AddressModel.fromJson(addressJson as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
     );
   }
 
@@ -142,12 +163,17 @@ class UserModel {
       'chronicDiseases': chronicDiseases,
       'injuries': injuries,
       'surgeries': surgeries,
+      // Serialize addresses
+      'addresses': addresses.map((address) => address.toJson()).toList(),
     };
   }
 
   // Helper method to get only demographic data
   Map<String, dynamic> getDemographicData() {
     return {
+      // Including email and phone here as they are often part of demographic info forms
+      'email': email,
+      'phone': phone,
       'title': title,
       'name': name,
       'birthDate': birthDate?.toIso8601String(),
@@ -183,6 +209,17 @@ class UserModel {
     };
   }
 
+  // Helper to get the default or first address for display
+  AddressModel? get defaultOrFirstAddress {
+    if (addresses.isEmpty) return null;
+    try {
+      return addresses.firstWhere((addr) => addr.isDefault);
+    } catch (e) {
+      // No default address found, return the first one
+      return addresses.first;
+    }
+  }
+
   // Method to create a copy with updated fields
   UserModel copyWith({
     String? id,
@@ -211,6 +248,7 @@ class UserModel {
     List<String>? chronicDiseases,
     List<String>? injuries,
     List<String>? surgeries,
+    List<AddressModel>? addresses, // Added addresses to copyWith
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -239,6 +277,7 @@ class UserModel {
       chronicDiseases: chronicDiseases ?? this.chronicDiseases,
       injuries: injuries ?? this.injuries,
       surgeries: surgeries ?? this.surgeries,
+      addresses: addresses ?? this.addresses, // Assign addresses in copyWith
     );
   }
 }

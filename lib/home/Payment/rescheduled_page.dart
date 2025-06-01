@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/home/notification/notification.dart';
 import 'package:medycall/home/profile/profile.dart';
 import 'package:medycall/History/history.dart';
 import 'package:medycall/home/home_screen.dart';
+import 'package:medycall/providers/user_provider.dart';
+import 'package:provider/provider.dart';
 
 class RescheduledPage extends StatefulWidget {
   const RescheduledPage({super.key});
@@ -18,8 +22,13 @@ class _RescheduledPageState extends State<RescheduledPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final userName = userProvider.user?.name ?? 'Guest';
     return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: false, title: _buildTopBar()),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: _buildCompactTopBar(userName),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -75,72 +84,144 @@ class _RescheduledPageState extends State<RescheduledPage> {
     );
   }
 
-  Widget _buildTopBar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundImage: AssetImage('assets/person.png'),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  int? _selectedTopBarIconIndex;
+
+  Widget _buildCompactTopBar(String userName) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: 8.0,
+      ), // Reduced padding
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left side - wrap in Expanded to prevent overflow
+          Expanded(
+            flex: 3, // Give more space to the left side
+            child: Row(
               children: [
-                Text(
-                  'Hello,',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: const Color(0xFF37847E),
+                CircleAvatar(
+                  radius: 16, // Slightly smaller radius
+                  backgroundImage: AssetImage(
+                    'assets/homescreen/home_profile.png',
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Mohadeseh Shokri',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: 10), // Reduced spacing
+                // Wrap the Column in Expanded to handle text overflow
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hello,',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12, // Slightly smaller font
+                          color: Color(0xFF37847E),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 3),
-                    GestureDetector(
-                      onTap: () {
-                        // Handle image tap
-                      },
-                      child: Image.asset(
-                        'assets/homescreen/pencil.png',
-                        width: 30,
-                        height: 30,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Wrap username in Flexible to handle long names
+                          Flexible(
+                            child: Text(
+                              userName, // Use the passed userName here
+                              style: GoogleFonts.poppins(
+                                fontSize: 14, // Slightly smaller font
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow:
+                                  TextOverflow
+                                      .ellipsis, // Add ellipsis for long names
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          _buildIcon(
+                            assetPath: 'assets/homescreen/pencil.png',
+                            index: 0,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProfileScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
-        Row(
-          children: [
-            const SizedBox(width: 3),
-            GestureDetector(
-              onTap: () {
-                // Handle image tap
-              },
-              child: Image.asset(
-                'assets/homescreen/notification.png',
-                width: 30,
-                height: 30,
+          ),
+          // Right side icons
+          Row(
+            mainAxisSize: MainAxisSize.min, // Important: minimize the size
+            children: [
+              _buildIcon(
+                assetPath: 'assets/homescreen/notification.png',
+                index: 1,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TabNavigatorScreen(),
+                    ),
+                  );
+                },
               ),
-            ),
-            const SizedBox(width: 3),
-            const SizedBox(width: 3),
-          ],
+              const SizedBox(width: 8),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIcon({
+    required String assetPath,
+    required int index,
+    required VoidCallback onTap,
+  }) {
+    final bool isSelected = _selectedTopBarIconIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          // Set this icon as selected, but only temporarily
+          _selectedTopBarIconIndex = index;
+        });
+
+        // Clear selection after a short delay (visual feedback)
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _selectedTopBarIconIndex = null;
+            });
+          }
+        });
+
+        // Execute the original onTap action
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(4), // Reduced padding
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? const Color(0xFF37847E).withOpacity(0.1)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(6), // Smaller radius
         ),
-      ],
+        child: Image.asset(
+          assetPath,
+          width: 24, // Smaller icon size
+          height: 24,
+          color: isSelected ? const Color(0xFF37847E) : null,
+        ),
+      ),
     );
   }
 
@@ -150,6 +231,7 @@ class _RescheduledPageState extends State<RescheduledPage> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -176,17 +258,14 @@ class _RescheduledPageState extends State<RescheduledPage> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -208,7 +287,7 @@ class _RescheduledPageState extends State<RescheduledPage> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -216,7 +295,7 @@ class _RescheduledPageState extends State<RescheduledPage> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -225,13 +304,15 @@ class _RescheduledPageState extends State<RescheduledPage> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -240,28 +321,28 @@ class _RescheduledPageState extends State<RescheduledPage> {
 
                 // Navigate based on index
                 if (index == 0) {
-                  Navigator.pushReplacement(
+                  Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => HomeScreen()),
                   );
                 } else if (index == 1) {
-                  Navigator.pushReplacement(
+                  Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => AppointmentScreen(),
                     ),
                   );
                 } else if (index == 3) {
-                  Navigator.pushReplacement(
+                  Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => MedicalHistoryPage(),
                     ),
                   );
                 } else if (index == 4) {
-                  Navigator.pushReplacement(
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

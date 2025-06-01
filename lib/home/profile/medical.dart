@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/History/history.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/services/user_service.dart';
 import 'package:medycall/models/user_model.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +17,7 @@ class MedicalInfoScreen extends StatefulWidget {
 }
 
 class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
-  int _selectedIndex = 4; // Profile is selected
+  int _selectedIndex = 1; // Profile is selected
   final UserService _userService = UserService();
   bool _isLoading = false;
 
@@ -544,6 +548,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -570,22 +575,19 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
-              const BottomNavigationBarItem(
-                icon: SizedBox(width: 24, height: 24),
+              BottomNavigationBarItem(
+                icon: const SizedBox(width: 24, height: 24),
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
@@ -602,7 +604,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -610,7 +612,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -619,30 +621,68 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
-                setState(() => _selectedIndex = index);
-                // Add navigation logic here
+                setState(() {
+                  _selectedIndex = index;
+                });
+
+                // Navigate based on index
+                if (index == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                } else if (index == 1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AppointmentScreen(),
+                    ),
+                  );
+                } else if (index == 3) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MedicalHistoryPage(),
+                    ),
+                  );
+                } else if (index == 4) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
+                  );
+                }
               }
             },
           ),
         ),
+        // Centered NIROG image
         Positioned(
           top: -20,
-          child: GestureDetector(
-            onTap: () => print('NIROG tapped from Medical Screen'),
-            child: Image.asset(
-              'assets/homescreen/nirog.png',
-              width: 51,
-              height: 54,
-            ),
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  print('NIROG tapped');
+                  // Add your NIROG button action here
+                },
+                child: Image.asset(
+                  'assets/homescreen/nirog.png',
+                  width: 51,
+                  height: 54,
+                ),
+              ),
+            ],
           ),
         ),
       ],

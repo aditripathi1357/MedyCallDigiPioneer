@@ -4,7 +4,10 @@ import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/articles.dart';
 import 'package:medycall/home/Payment/coupon.dart';
 import 'package:medycall/home/filter.dart';
-import 'package:percent_indicator/linear_percent_indicator.dart';
+import 'package:medycall/home/menu/diet.dart';
+import 'package:medycall/home/menu/waterintake.dart';
+import 'package:medycall/home/menu/yoga.dart';
+// import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:medycall/providers/user_provider.dart';
@@ -942,14 +945,17 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isFrontCard,
   ) {
     return Container(
-      width: MediaQuery.of(context).size.width * 0.85, // Adjust width as needed
-      padding: const EdgeInsets.all(16),
+      width: MediaQuery.of(context).size.width * 0.85,
+      height: 160,
       decoration: BoxDecoration(
-        color:
-            isFrontCard
-                ? const Color(0xFF086861)
-                : const Color(0xFF075A54), // Slightly darker for back card
         borderRadius: BorderRadius.circular(12),
+        image: DecorationImage(
+          image: AssetImage('assets/appointmentcard.png'),
+          fit: BoxFit.cover,
+          onError: (exception, stackTrace) {
+            print('Error loading card background: assets/appointmentcard.png');
+          },
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.2),
@@ -959,147 +965,202 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundImage: AssetImage(doctor.imagePath),
-            onBackgroundImageError: (exception, stackTrace) {
-              // Consider adding a placeholder or logging for missing assets
-              print('Error loading image: ${doctor.imagePath}');
-            },
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  doctor.name,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    doctor.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  doctor.specialization,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.8),
+                  Text(
+                    doctor.specialization,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${doctor.experience} Experience',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  doctor.languages,
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
-                ),
-                if (isFrontCard) ...[
-                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // Handle Book Now for this doctor
-                            print('Book Now: ${doctor.name}');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: Text(
-                            'Book Now',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF018C7E),
-                            ),
-                          ),
-                        ),
+                      const Icon(
+                        Icons.work_outline,
+                        color: Colors.white,
+                        size: 14,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            // Handle Know More for this doctor
-                            print('Know More: ${doctor.name}');
-                          },
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.white),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          doctor.experience,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.white.withOpacity(0.8),
                           ),
-                          child: Text(
-                            'Know More',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
+                  Row(
+                    children: [
+                      const Icon(Icons.language, color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          doctor.languages,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isFrontCard) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              print('Book Now: ${doctor.name}');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 6,
+                                horizontal: 12,
+                              ),
+                              minimumSize: const Size(0, 28),
+                            ),
+                            child: Text(
+                              'Book Now',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF018C7E),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              print('Know More: ${doctor.name}');
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Colors.white,
+                                width: 1,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 6,
+                                horizontal: 12,
+                              ),
+                              minimumSize: const Size(0, 28),
+                            ),
+                            child: Text(
+                              'Know More',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Container(
+              width: 90,
+              height: 120,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                image: DecorationImage(
+                  image: AssetImage(doctor.imagePath),
+                  fit: BoxFit.cover,
+                  onError: (exception, stackTrace) {
+                    print('Error loading image: ${doctor.imagePath}');
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-  // Inside your existing Widget class (e.g., _MyExistingPageState or MyExistingPage)
 
-  // --- Add this _buildFavoriteDoctors method ---
-  // You'll need to manage this list of doctors.
-  // It could be a state variable, passed in, or fetched from an API.
-  final List<Doctor> _favoriteDoctors = [
-    // Example Data
+  // Add this as a state variable in your StatefulWidget class
+  List<Doctor> _favoriteDoctors = [
     Doctor(
       name: 'Dr. Anya Sharma',
       specialization: 'BDS, MDS (Orthodontics)',
       experience: '10 Years',
       languages: 'English, Hindi',
-      imagePath:
-          'assets/doctor_anya.png', // Replace with your actual asset path
+      imagePath: 'assets/ladiesdoctor.png',
     ),
     Doctor(
       name: 'Dr. Bansi Patel',
       specialization: 'MBBS, MD (Medicine)',
       experience: '8 Years',
       languages: 'Hindi, English',
-      imagePath:
-          'assets/ladiesdoctor.png', // Replace with your actual asset path
+      imagePath: 'assets/ladiesdoctor.png',
     ),
-    // Add more doctors here if needed
+    Doctor(
+      name: 'Dr. Rahul Gupta',
+      specialization: 'MBBS, MS (Surgery)',
+      experience: '12 Years',
+      languages: 'English, Hindi, Gujarati',
+      imagePath: 'assets/ladiesdoctor.png',
+    ),
   ];
 
+  // Add this method to remove top card
+  void _removeTopCard() {
+    if (_favoriteDoctors.isNotEmpty) {
+      setState(() {
+        _favoriteDoctors.removeAt(_favoriteDoctors.length - 1);
+      });
+    }
+  }
+
   Widget _buildFavoriteDoctors(BuildContext context) {
-    // Renamed from your original to avoid conflict if it was a top-level function
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16.0,
-          ), // Add padding for the title if desired
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Text(
             'Favorite Doctors',
             style: GoogleFonts.poppins(
@@ -1119,38 +1180,37 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         else
           SizedBox(
-            height:
-                220, // Adjust this based on your card content and desired overlap
+            height: 200,
             child: Stack(
               alignment: Alignment.center,
               children: List.generate(_favoriteDoctors.length, (index) {
                 final doctor = _favoriteDoctors[index];
-                // The last doctor in the list is considered the "front" card
                 final isFrontCard = index == _favoriteDoctors.length - 1;
-
-                // Calculate offset for stacking. Cards are "pulled" from the right.
-                // The front card (last in list) has no offset.
-                // The card behind it is offset by 20, the one behind that by 40, etc.
                 double rightOffset =
-                    (_favoriteDoctors.length - 1 - index) *
-                    20.0; // Pushes cards to the left
-                double topOffset =
-                    (_favoriteDoctors.length - 1 - index) *
-                    15.0; // Pushes cards upwards
+                    (_favoriteDoctors.length - 1 - index) * 15.0;
+                double topOffset = (_favoriteDoctors.length - 1 - index) * 10.0;
 
                 return Positioned(
-                  // Adjust top and horizontal positioning for the desired stack effect
                   top: topOffset,
-                  // Center the stack horizontally, then apply individual offsets
-                  // This ensures the front card is centered, and others stack relative to it
-                  left: rightOffset, // Pushes cards from the left
-                  right:
-                      0, // Keep front card aligned to the right within its conceptual space
-                  // For a centered stack appearance relative to the SizedBox:
-                  // left: (MediaQuery.of(context).size.width - (MediaQuery.of(context).size.width * 0.85) - rightOffset) / 2 + rightOffset,
-                  child: _buildDoctorCard(context, doctor, isFrontCard),
+                  left: rightOffset,
+                  right: 0,
+                  child:
+                      isFrontCard
+                          ? Dismissible(
+                            key: Key(doctor.name),
+                            direction: DismissDirection.horizontal,
+                            onDismissed: (direction) {
+                              _removeTopCard();
+                            },
+                            child: _buildDoctorCard(
+                              context,
+                              doctor,
+                              isFrontCard,
+                            ),
+                          )
+                          : _buildDoctorCard(context, doctor, isFrontCard),
                 );
-              }), // No .reversed needed due to how Positioned works with Stack children order
+              }),
             ),
           ),
       ],
@@ -1352,35 +1412,45 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: tealColor.withOpacity(0.2)),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      "assets/homescreen/bottle.png",
-                      height: 30,
-                      width: 26,
-                      fit: BoxFit.contain,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const WaterReminderPage(),
                     ),
-                    const SizedBox(width: 2),
-                    Text(
-                      "Water\nBuddy",
-                      style: GoogleFonts.poppins(
-                        color: tealColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: tealColor.withOpacity(0.2)),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        "assets/homescreen/bottle.png",
+                        height: 30,
+                        width: 26,
+                        fit: BoxFit.contain,
                       ),
-                      textAlign: TextAlign.right,
-                    ),
-                  ],
+                      const SizedBox(width: 2),
+                      Text(
+                        "Water\nBuddy",
+                        style: GoogleFonts.poppins(
+                          color: tealColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 18),
@@ -1393,35 +1463,43 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               const SizedBox(width: 18),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: tealColor.withOpacity(0.2)),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      "assets/homescreen/Yoga.png",
-                      height: 30,
-                      width: 29,
-                      fit: BoxFit.contain,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Yoga\nTeacher",
-                      style: GoogleFonts.poppins(
-                        color: tealColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const YogaPage()),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: tealColor.withOpacity(0.2)),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        "assets/homescreen/Yoga.png",
+                        height: 30,
+                        width: 29,
+                        fit: BoxFit.contain,
                       ),
-                      textAlign: TextAlign.left,
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        "Yoga\nTeacher",
+                        style: GoogleFonts.poppins(
+                          color: tealColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1474,39 +1552,51 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: tealColor.withOpacity(0.2)),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      "assets/homescreen/diet.png",
-                      height: 30,
-                      width: 29,
-                      fit: BoxFit.contain,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MealTrackerPage(),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Diet\nGuru",
-                      style: GoogleFonts.poppins(
-                        color: tealColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: tealColor.withOpacity(0.2)),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        "assets/homescreen/diet.png",
+                        height: 30,
+                        width: 29,
+                        fit: BoxFit.contain,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        "Diet\nGuru",
+                        style: GoogleFonts.poppins(
+                          color: tealColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 18),
             ],
           ),
+
+          const SizedBox(height: 28),
 
           const SizedBox(height: 28),
         ],
@@ -1841,6 +1931,7 @@ class _HomeScreenState extends State<HomeScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -1867,17 +1958,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -1898,19 +1986,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'History',
               ),
               BottomNavigationBarItem(
-                icon: Container(
-                  width: 35,
+                icon: Image.asset(
+                  'assets/homescreen/medyscan.png',
+                  width: 24,
                   height: 24,
-                  alignment: Alignment.center,
-                  child: Image.asset(
-                    'assets/homescreen/medyscan.png',
-                    width: 35,
-                    height: 35,
-                    color:
-                        _selectedIndex == 4
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                  color:
+                      _selectedIndex == 4
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Medyscan',
               ),
@@ -1921,13 +2004,15 @@ class _HomeScreenState extends State<HomeScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:medycall/auth/otpemail.dart';
 import 'package:medycall/auth/signin.dart';
+import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/models/user_model.dart';
 import 'package:medycall/providers/user_provider.dart';
 import 'package:provider/provider.dart';
@@ -282,7 +283,14 @@ class _SignUpemailState extends State<Signupemail> {
                             width: double.infinity,
                             height: 43,
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const HomeScreen(),
+                                  ),
+                                );
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 side: const BorderSide(

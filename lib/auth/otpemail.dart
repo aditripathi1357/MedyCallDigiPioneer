@@ -8,6 +8,7 @@ import 'package:medycall/services/user_service.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async'; // Import for Timer
 
 class OtpEmail extends StatefulWidget {
   final String email;
@@ -32,6 +33,43 @@ class _OtpEmailState extends State<OtpEmail> {
   String _otp = '';
   final _supabase = Supabase.instance.client;
 
+  // Timer state variables
+  Timer? _timer;
+  int _secondsRemaining = 60; // Initial time for the timer
+  bool _canResend = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // Cancel timer to prevent memory leaks
+    super.dispose();
+  }
+
+  // Method to start the timer
+  void _startTimer() {
+    _secondsRemaining = 60; // Reset timer duration
+    _canResend = false; // Disable resend button initially
+    _timer?.cancel(); // Cancel any existing timer
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsRemaining > 0) {
+        setState(() {
+          _secondsRemaining--;
+        });
+      } else {
+        setState(() {
+          _canResend = true; // Enable resend when timer reaches 0
+        });
+        timer.cancel(); // Stop the timer
+      }
+    });
+  }
+
   Future<void> _verifyOTP() async {
     if (_otp.length != 6) {
       setState(() {
@@ -47,7 +85,6 @@ class _OtpEmailState extends State<OtpEmail> {
 
     try {
       AuthResponse response;
-
       if (widget.isSignUp) {
         // Sign up verification
         response = await _supabase.auth.verifyOTP(
@@ -60,13 +97,7 @@ class _OtpEmailState extends State<OtpEmail> {
         response = await _supabase.auth.verifyOTP(
           email: widget.email,
           token: _otp,
-          type:
-              OtpType
-                  .email, // Corrected: Was OtpType.signup, should be for email/magiclink/recovery etc.
-          // Supabase uses OtpType.email for generic email OTPs during sign-in.
-          // Or OtpType.magiclink if you were using magic links.
-          // For password recovery, it's OtpType.recovery.
-          // Since signin.dart uses signInWithOtp, OtpType.email is appropriate here.
+          type: OtpType.email,
         );
       }
 
@@ -129,12 +160,6 @@ class _OtpEmailState extends State<OtpEmail> {
             email: widget.email,
             // Initialize other UserModel fields as nullable or with defaults
             // as per your UserModel definition if they are not fetched.
-            // For example:
-            // phone: null,
-            // title: null,
-            // birthDate: null,
-            // gender: null,
-            // etc.
           );
           userProvider.setUser(basicUser);
           print(
@@ -206,49 +231,23 @@ class _OtpEmailState extends State<OtpEmail> {
   }
 
   Future<void> _resendOTP() async {
+    if (!_canResend && _secondsRemaining > 0) {
+      // Prevent resending if the timer is still running
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _canResend = false; // Disable resend immediately upon trying
     });
 
     try {
-      // For both sign-up and sign-in, `signInWithOtp` can be used to resend the OTP
-      // if the user already exists or to initiate if they don't (though signUp is more explicit for creation).
-      // If `shouldCreateUser` is false in `signInWithOtp` (as in your SignInPage),
-      // it will only send OTP if user exists.
-      // If user was created via `signUp` (which sends an OTP), resending via `signInWithOtp`
-      // to the same email should be fine for a new OTP.
-      // Alternatively, for sign-up, you could call `_supabase.auth.resend(...)` if available
-      // or re-trigger the original signUp call if it handles resends.
-      // Supabase's `resend` method is usually preferred if available for the flow.
-      // Let's use signInWithOtp for consistency with your SignInPage for resending an email OTP.
-      // The `signUp` call also sends an OTP, so if the user didn't get the first one from signUp,
-      // `signInWithOtp` to the same email will generate a new OTP for verification.
-
-      // If it's a sign-up flow and the initial OTP was for account creation:
-      if (widget.isSignUp) {
-        // Option 1: Using resend if available and appropriate for signup OTPs
-        // await _supabase.auth.resend(type: OtpType.signup, email: widget.email);
-
-        // Option 2: Retriggering a similar mechanism that sent the first OTP.
-        // If signUp was used initially:
-        // await _supabase.auth.signUp(email: widget.email, password: 'some_temporary_or_random_password_if_required_by_sdk_for_this_call');
-        // For email-only OTP signup, Supabase often just needs the email.
-        // If the user object isn't fully created yet, signInWithOtp might be better.
-
-        // Let's stick to signInWithOtp as it's versatile for sending OTPs to an email.
-        await _supabase.auth.signInWithOtp(
-          email: widget.email,
-          shouldCreateUser:
-              false, // Important: don't create a new user if resending
-        );
-      } else {
-        // For sign in, resend sign in OTP
-        await _supabase.auth.signInWithOtp(
-          email: widget.email,
-          shouldCreateUser: false, // User should already exist for sign-in
-        );
-      }
+      await _supabase.auth.signInWithOtp(
+        email: widget.email,
+        shouldCreateUser:
+            false, // Important: don't create a new user if resending
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -259,6 +258,7 @@ class _OtpEmailState extends State<OtpEmail> {
             backgroundColor: Color(0xFF086861),
           ),
         );
+        _startTimer(); // Restart the timer on successful resend
       }
     } catch (e) {
       setState(() {
@@ -268,12 +268,21 @@ class _OtpEmailState extends State<OtpEmail> {
           _errorMessage = 'Failed to resend OTP: ${e.toString()}';
         }
         print("OtpEmail: Error resending OTP: $e");
+        // If resend fails, we might want to re-enable resend or handle appropriately
+        _canResend = true; // Re-enable resend if it failed
       });
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  // Helper to format time as MM:SS
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -301,9 +310,10 @@ class _OtpEmailState extends State<OtpEmail> {
                 ],
               ),
             ),
+            // Adjusted Positioned widget for 12px from right as previously requested
             Positioned(
               top: 120,
-              right: 10,
+              right: 12,
               child: Transform.rotate(
                 angle: -80 * (3.1415926535 / 180),
                 child: Image.asset('assets/Vector.png'),
@@ -334,7 +344,6 @@ class _OtpEmailState extends State<OtpEmail> {
                 ),
               ),
             ),
-
             // Main content
             Center(
               child: SingleChildScrollView(
@@ -376,8 +385,8 @@ class _OtpEmailState extends State<OtpEmail> {
                             ),
                           ),
                           const SizedBox(height: 40),
-
                           // OTP Input Field
+                          // Adjusted fieldWidth to fix RenderFlex overflow in the internal Row
                           OtpTextField(
                             numberOfFields: 6,
                             borderColor: const Color(0xFF086861),
@@ -385,7 +394,7 @@ class _OtpEmailState extends State<OtpEmail> {
                             showFieldAsBox: true,
                             borderWidth: 2.0,
                             fieldWidth:
-                                45, // Adjusted for better fit on some screens
+                                35, // Reduced field width to prevent overflow <sup data-citation="1"><a href="https://stackoverflow.com/questions/74564092/how-to-avoid-renderflow-error-when-keyboard-appears-in-flutter" target="_blank" title="How to avoid RenderFlow error when keyboard appears in ...">1</a></sup>
                             textStyle: const TextStyle(
                               fontSize: 18,
                               color: Color(0xFF086861),
@@ -406,15 +415,57 @@ class _OtpEmailState extends State<OtpEmail> {
                               _verifyOTP(); // Call verify OTP when all fields are filled
                             },
                           ),
+                          const SizedBox(height: 20), // Space below OTP fields
+                          // Timer and Resend Option
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                "Reset OTP in",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              // Show timer if remaining seconds > 0, otherwise show Resend link
+                              if (_secondsRemaining > 0)
+                                Text(
+                                  _formatTime(_secondsRemaining),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF086861),
+                                  ),
+                                ),
+                              if (_secondsRemaining <= 0)
+                                GestureDetector(
+                                  onTap:
+                                      _isLoading || !_canResend
+                                          ? null
+                                          : _resendOTP,
+                                  child: Text(
+                                    'Resend',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          _isLoading || !_canResend
+                                              ? Colors.grey
+                                              : const Color(0xFF086861),
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+
                           if (_errorMessage != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 16.0),
                               child: Text(
                                 _errorMessage!,
                                 style: const TextStyle(
-                                  color:
-                                      Colors
-                                          .redAccent, // Slightly different red
+                                  color: Colors.redAccent,
                                   fontSize: 14,
                                 ),
                                 textAlign: TextAlign.center,
@@ -459,36 +510,6 @@ class _OtpEmailState extends State<OtpEmail> {
                                         ),
                                       ),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Resend OTP option
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                "Didn't receive the code? ",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: _isLoading ? null : _resendOTP,
-                                child: Text(
-                                  'Resend',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        _isLoading
-                                            ? Colors.grey
-                                            : const Color(0xFF086861),
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/changelocation.dart';
 import 'package:medycall/Appointment/appointment.dart';
 import 'package:medycall/home/profile/profile.dart';
@@ -696,6 +697,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -722,17 +724,14 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -754,7 +753,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -762,7 +761,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -771,13 +770,15 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -807,7 +808,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

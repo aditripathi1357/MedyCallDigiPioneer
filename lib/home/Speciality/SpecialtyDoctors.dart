@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/HospitalListing.dart';
-import 'package:medycall/home/Speciality/FilterSpeciality.dart';
 import 'package:medycall/home/Speciality/DoctorProfile.dart';
 import 'package:medycall/home/Speciality/changelocation.dart';
 import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/home/filter.dart';
 import 'package:medycall/home/profile/profile.dart';
 import 'package:medycall/History/history.dart';
 import 'package:medycall/home/home_screen.dart';
@@ -22,8 +23,8 @@ class SpecialtyDoctorsPage extends StatefulWidget {
 class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
   int _selectedIndex = 0;
   String _selectedFilter = 'OPD';
-  //int _selectedIndex = 1; // Appointment is selected
-  int _selectedTab = 0; // Upcoming is selected by default
+  int _selectedTab = 0; // 0 for Doctor, 1 for Hospital
+
   // Mock data for doctors - replace with data from your database
   final List<Map<String, dynamic>> _doctors = [
     {
@@ -53,6 +54,15 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
       'image': 'assets/doctors/doctor1.png',
     },
   ];
+  FilterData filterData = FilterData();
+
+  // Add this method
+  void _onFilterApplied(FilterData newFilterData) {
+    setState(() {
+      filterData = newFilterData;
+    });
+    // Your filter logic here
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,8 +145,16 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => const FilterBottomSheet(),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        builder:
+                            (context) => FilterSheet(
+                              initialFilterData: filterData,
+                              onApplyFilters: _onFilterApplied,
+                            ),
                       );
                     },
                     padding: EdgeInsets.zero,
@@ -299,6 +317,7 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
             Expanded(
               child: GestureDetector(
                 onTap: () {
+                  // Doctor tab is already selected, no navigation needed
                   setState(() {
                     _selectedTab = 0;
                   });
@@ -306,10 +325,9 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color:
-                        _selectedTab == 0
-                            ? const Color(0xFF00796B)
-                            : Colors.transparent,
+                    color: const Color(
+                      0xFF00796B,
+                    ), // Always selected since we're on Doctor page
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
@@ -317,9 +335,7 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                       'Doctor',
                       style: GoogleFonts.poppins(
                         color:
-                            _selectedTab == 0
-                                ? Colors.white
-                                : const Color(0xFF00796B),
+                            Colors.white, // Always white since always selected
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -331,32 +347,30 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
             Expanded(
               child: GestureDetector(
                 onTap: () {
-                  Navigator.push(
+                  // Navigate to Hospital page
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder:
-                          (context) =>
-                              HospitalListingScreen(specialty: 'Hospital'),
+                          (context) => HospitalListingScreen(
+                            specialty: widget.specialty,
+                          ),
                     ),
                   );
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color:
-                        _selectedTab == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.transparent,
+                    color: Colors.transparent, // Not selected
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Text(
                       'Hospital',
                       style: GoogleFonts.poppins(
-                        color:
-                            _selectedTab == 1
-                                ? Colors.white
-                                : const Color(0xFF00796B),
+                        color: const Color(
+                          0xFF00796B,
+                        ), // Teal color for unselected
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -769,7 +783,14 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                         ],
                       ),
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DoctorProfileScreen(),
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00796B),
                           padding: const EdgeInsets.symmetric(
@@ -806,6 +827,7 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -832,17 +854,14 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -864,7 +883,7 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -872,7 +891,7 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -881,13 +900,15 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -917,7 +938,7 @@ class _SpecialtyDoctorsPageState extends State<SpecialtyDoctorsPage> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

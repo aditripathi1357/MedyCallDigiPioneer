@@ -1,30 +1,33 @@
+// ... other imports in history.dart ...
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:medycall/Appointment/appointment.dart';
-import 'package:medycall/home/profile/profile.dart';
-import 'package:medycall/home/home_screen.dart';
-// import 'package:path_provider/path_provider.dart';
+import 'package:medycall/Appointment/appointment.dart'; // Assuming this path is correct
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/home/menu/yoga.dart';
+import 'package:medycall/home/profile/profile.dart'; // Assuming this path is correct
+import 'package:medycall/home/home_screen.dart'; // Assuming this path is correct
+import 'package:path_provider/path_provider.dart'; // Make sure this is imported
 import 'package:path/path.dart' as path;
-import 'package:medycall/home/notification/notification.dart';
-import 'package:medycall/providers/user_provider.dart';
+import 'package:medycall/home/notification/notification.dart'; // Assuming this path is correct
+import 'package:medycall/providers/user_provider.dart'; // Assuming this path is correct
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart'; // For date formatting
 
 class MedicalHistoryPage extends StatefulWidget {
   const MedicalHistoryPage({Key? key}) : super(key: key);
-
   @override
   State<MedicalHistoryPage> createState() => _MedicalHistoryPageState();
 }
 
 class MedicalRecordItem {
+  // This remains for OPD/Tele records
   final String name;
   final String date;
-  final String type; // 'image' or 'document'
+  final String type;
   final File file;
-  final String recordType; // 'OPD' or 'Tele'
-
+  final String recordType;
   MedicalRecordItem({
     required this.name,
     required this.date,
@@ -35,16 +38,213 @@ class MedicalRecordItem {
 }
 
 class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
-  int _selectedIndex = 3; // History tab is selected
-  String _selectedRecordType = "OPD"; // Default to OPD
+  int _selectedIndex = 3;
+  String _selectedRecordType = "OPD";
   final ImagePicker _picker = ImagePicker();
-  List<MedicalRecordItem> records = [];
+  List<MedicalRecordItem> records = []; // For OPD/Tele
+
+  // For Medyscan (Yoga) sessions
+  List<VideoRecordingItem> _medyscanSessionRecords = [];
+  bool _isLoadingMedyscanRecords = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load initial records based on default selection or fetch all then filter
+    if (_selectedRecordType == "Medyscan") {
+      _loadMedyscanSessionRecords();
+    } else {
+      // Your existing logic to load OPD/Tele records if any
+    }
+  }
+
+  // Method to load Medyscan (Yoga) session recordings
+  Future<void> _loadMedyscanSessionRecords() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingMedyscanRecords = true;
+    });
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final recordingsDir = Directory(
+        '${directory.path}/yoga_sessions',
+      ); // Same path as YogaPage
+
+      if (!await recordingsDir.exists()) {
+        if (mounted) {
+          setState(() {
+            _medyscanSessionRecords = [];
+            _isLoadingMedyscanRecords = false;
+          });
+        }
+        return;
+      }
+
+      final files =
+          recordingsDir
+              .listSync()
+              .where((item) => item.path.endsWith('.mp4'))
+              .toList();
+      final List<VideoRecordingItem> loadedItems = [];
+      for (var entity in files) {
+        if (entity is File) {
+          int durationSeconds = 0;
+          final nameParts = entity.path.split('/').last.split('_');
+          final durationPart = nameParts.firstWhere(
+            (part) => part.startsWith('DUR') && part.endsWith('s.mp4'),
+            orElse: () => '',
+          );
+          if (durationPart.isNotEmpty) {
+            durationSeconds =
+                int.tryParse(
+                  durationPart.replaceAll('DUR', '').replaceAll('s.mp4', ''),
+                ) ??
+                0;
+          }
+          loadedItems.add(
+            VideoRecordingItem(
+              filePath: entity.path,
+              fileName: entity.path.split('/').last,
+              dateRecorded: await entity.lastModified(),
+              duration: Duration(seconds: durationSeconds),
+            ),
+          );
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _medyscanSessionRecords =
+              loadedItems..sort(
+                (a, b) => b.dateRecorded.compareTo(a.dateRecorded),
+              ); // Sort by newest first
+          _isLoadingMedyscanRecords = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading Medyscan session recordings: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not load Medyscan sessions: ${e.toString()}',
+              style: GoogleFonts.poppins(),
+            ),
+          ),
+        );
+        setState(() {
+          _isLoadingMedyscanRecords = false;
+        });
+      }
+    }
+  }
+
+  // Helper to format duration (can be shared or copied)
+  String _formatDuration(int totalSeconds) {
+    final duration = Duration(seconds: totalSeconds);
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits(duration.inHours);
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    if (duration.inHours > 0) {
+      return '$hours:$minutes:$seconds';
+    }
+    return '$minutes:$seconds';
+  }
+
+  // Play Medyscan video
+  void _playMedyscanVideo(String filePath) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => VideoPlayerPage(
+              filePath: filePath,
+            ), // Uses VideoPlayerPage from yoga_page.dart
+      ),
+    );
+  }
+
+  // Confirm and delete Medyscan recording
+  Future<void> _confirmDeleteMedyscanRecording(
+    VideoRecordingItem recording,
+  ) async {
+    final bool? confirmDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Recording?', style: GoogleFonts.poppins()),
+          content: Text(
+            'Are you sure you want to delete "${recording.fileName}"?',
+            style: GoogleFonts.poppins(),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(color: Colors.grey),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+            ),
+            TextButton(
+              child: Text(
+                'Delete',
+                style: GoogleFonts.poppins(color: Colors.red),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmDelete == true) {
+      _deleteMedyscanRecording(recording);
+    }
+  }
+
+  Future<void> _deleteMedyscanRecording(VideoRecordingItem recording) async {
+    try {
+      final file = File(recording.filePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      if (mounted) {
+        setState(() {
+          _medyscanSessionRecords.removeWhere(
+            (item) => item.filePath == recording.filePath,
+          );
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${recording.fileName} deleted.',
+              style: GoogleFonts.poppins(),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error deleting Medyscan recording: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to delete ${recording.fileName}.',
+              style: GoogleFonts.poppins(),
+            ),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final userName =
-        userProvider.user?.name ?? 'Guest'; // Default to 'Guest' if no user
+    final userName = userProvider.user?.name ?? 'Guest';
     return Scaffold(
       drawer: const Drawer(),
       body: SafeArea(
@@ -57,7 +257,10 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
               const SizedBox(height: 20),
               Expanded(
                 child:
-                    records.isEmpty
+                    (_selectedRecordType == "Medyscan"
+                                ? _medyscanSessionRecords.isEmpty
+                                : records.isEmpty) &&
+                            !_isLoadingMedyscanRecords
                         ? _buildNoRecordsContent()
                         : _buildRecordsContent(),
               ),
@@ -69,10 +272,9 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     );
   }
 
-  // Add this field to your _HomeScreenState class
   int? _selectedTopBarIconIndex;
-
   Widget _buildTopBar(String userName) {
+    // ... (Your existing _buildTopBar code)
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -154,16 +356,6 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
               },
             ),
             const SizedBox(width: 8),
-            Builder(
-              builder:
-                  (context) => _buildIcon(
-                    assetPath: 'assets/homescreen/menu.png',
-                    index: 2,
-                    onTap: () {
-                      Scaffold.of(context).openDrawer();
-                    },
-                  ),
-            ),
           ],
         ),
       ],
@@ -175,15 +367,14 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     required int index,
     required VoidCallback onTap,
   }) {
+    // ... (Your existing _buildIcon code)
     final bool isSelected = _selectedTopBarIconIndex == index;
-
     return GestureDetector(
       onTap: () {
         setState(() {
           // Set this icon as selected, but only temporarily
           _selectedTopBarIconIndex = index;
         });
-
         // Clear selection after a short delay (visual feedback)
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) {
@@ -192,7 +383,6 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
             });
           }
         });
-
         // Execute the original onTap action
         onTap();
       },
@@ -215,51 +405,124 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     );
   }
 
+  Widget _buildAddRecordSection() {
+    if (_selectedRecordType == "Medyscan") {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Yoga Session',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Center(
+            child: ElevatedButton.icon(
+              icon: Icon(Icons.videocam_outlined, color: Colors.white),
+              label: Text(
+                'Record New Yoga Session',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const YogaPage()),
+                ).then((_) {
+                  // After returning from YogaPage
+                  if (_selectedRecordType == "Medyscan" && mounted) {
+                    _loadMedyscanSessionRecords(); // Refresh the list
+                  }
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00796B),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                textStyle: GoogleFonts.poppins(fontSize: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      // OPD or Tele
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Add Record',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildUploadOption(
+            icon: Icons.camera_alt_outlined,
+            title: 'Take a photo',
+            onTap: _takePhoto,
+          ),
+          const SizedBox(height: 10),
+          _buildUploadOption(
+            icon: Icons.image_outlined,
+            title: 'Upload from gallery',
+            onTap: _pickImage,
+          ),
+          const SizedBox(height: 10),
+          _buildUploadOption(
+            icon: Icons.file_copy_outlined,
+            title: 'Upload files',
+            onTap: _pickDocument,
+          ),
+        ],
+      );
+    }
+  }
+
   Widget _buildNoRecordsContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Oops! No Medical Records Found',
+          _selectedRecordType == "Medyscan"
+              ? 'No Yoga Sessions Found'
+              : 'Oops! No Medical Records Found',
           style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
         Text(
-          'A detailed health history helps doctor diagnose you better',
+          _selectedRecordType == "Medyscan"
+              ? 'Tap below to record a new yoga session.'
+              : 'A detailed health history helps doctor diagnose you better',
           style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54),
         ),
         const SizedBox(height: 16),
         _buildRecordTypeSelector(),
         const SizedBox(height: 20),
-        Text(
-          'Add Record',
-          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 14),
-        _buildUploadOption(
-          icon: Icons.camera_alt_outlined,
-          title: 'Take a photo',
-          onTap: _takePhoto,
-        ),
-        const SizedBox(height: 10),
-        _buildUploadOption(
-          icon: Icons.image_outlined,
-          title: 'Upload from gallery',
-          onTap: _pickImage,
-        ),
-        const SizedBox(height: 10),
-        _buildUploadOption(
-          icon: Icons.file_copy_outlined,
-          title: 'Upload files',
-          onTap: _pickDocument,
-        ),
+        _buildAddRecordSection(), // Updated section
         const Spacer(),
-        Center(
-          child: Text(
-            'No records uploaded yet',
-            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black38),
+        if (_isLoadingMedyscanRecords && _selectedRecordType == "Medyscan")
+          Center(child: CircularProgressIndicator())
+        else
+          Center(
+            child: Text(
+              _selectedRecordType == "Medyscan"
+                  ? 'No yoga sessions recorded yet.'
+                  : 'No records uploaded yet',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.black38),
+              textAlign: TextAlign.center,
+            ),
           ),
-        ),
         const SizedBox(height: 20),
       ],
     );
@@ -270,42 +533,27 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Your Medical Records',
+          _selectedRecordType == "Medyscan"
+              ? 'Your Yoga Sessions'
+              : 'Your Medical Records',
           style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
         Text(
-          'A detailed health history helps doctor diagnose you better',
+          _selectedRecordType == "Medyscan"
+              ? 'Review your past yoga sessions.'
+              : 'A detailed health history helps doctor diagnose you better',
           style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54),
         ),
         const SizedBox(height: 16),
         _buildRecordTypeSelector(),
         const SizedBox(height: 20),
-        Text(
-          'Add Record',
-          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 14),
-        _buildUploadOption(
-          icon: Icons.camera_alt_outlined,
-          title: 'Take a photo',
-          onTap: _takePhoto,
-        ),
-        const SizedBox(height: 10),
-        _buildUploadOption(
-          icon: Icons.image_outlined,
-          title: 'Upload from gallery',
-          onTap: _pickImage,
-        ),
-        const SizedBox(height: 10),
-        _buildUploadOption(
-          icon: Icons.file_copy_outlined,
-          title: 'Upload files',
-          onTap: _pickDocument,
-        ),
+        _buildAddRecordSection(), // Updated section
         const SizedBox(height: 20),
         Text(
-          'Uploaded Records',
+          _selectedRecordType == "Medyscan"
+              ? 'Recorded Sessions'
+              : 'Uploaded Records',
           style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 10),
@@ -315,113 +563,167 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
   }
 
   Widget _buildRecordTypeSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // OPD Card
-        InkWell(
-          onTap: () {
-            setState(() {
-              _selectedRecordType = "OPD";
-            });
-          },
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            width: 170,
-            height: 67,
-            decoration: BoxDecoration(
-              color:
-                  _selectedRecordType == "OPD"
-                      ? Color(0xFFE1F5F3)
-                      : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 2,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: Image.asset(
-                    'assets/homescreen/opd.png',
-                    width: 80,
-                    height: 57,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'OPD',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedRecordType = "OPD";
+                  });
+                  // Potentially load OPD records here if not already loaded
+                },
+                // ... OPD Card styling ...
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 67,
+                  decoration: BoxDecoration(
                     color:
                         _selectedRecordType == "OPD"
-                            ? Color(0xFF00796B)
-                            : Colors.black,
+                            ? Color(0xFFE1F5F3)
+                            : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [/* ... shadows ... */],
+                  ),
+                  child: Row(
+                    /* ... OPD content ... */
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Image.asset(
+                          'assets/homescreen/opd.png',
+                          width: 50,
+                          height: 40,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'OPD',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color:
+                                _selectedRecordType == "OPD"
+                                    ? Color(0xFF00796B)
+                                    : Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-
-        // Tele-consultation Card
-        InkWell(
-          onTap: () {
-            setState(() {
-              _selectedRecordType = "Tele";
-            });
-          },
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            width: 170,
-            height: 67,
-            decoration: BoxDecoration(
-              color:
-                  _selectedRecordType == "Tele"
-                      ? Color(0xFFE1F5F3)
-                      : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 2,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: Image.asset(
-                    'assets/homescreen/teleconsultation.png',
-                    width: 42,
-                    height: 42,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Tele-\nconsultation',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedRecordType = "Tele";
+                  });
+                  // Potentially load Tele records here
+                },
+                // ... Tele Card styling ...
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 67,
+                  decoration: BoxDecoration(
                     color:
                         _selectedRecordType == "Tele"
-                            ? Color(0xFF00796B)
-                            : Colors.black,
+                            ? Color(0xFFE1F5F3)
+                            : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [/* ... shadows ... */],
+                  ),
+                  child: Row(
+                    /* ... Tele content ... */
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Image.asset(
+                          'assets/homescreen/teleconsultation.png',
+                          width: 30,
+                          height: 30,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Tele-consultation',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color:
+                                _selectedRecordType == "Tele"
+                                    ? Color(0xFF00796B)
+                                    : Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedRecordType = "Medyscan";
+                });
+                _loadMedyscanSessionRecords(); // Load Medyscan records when selected
+              },
+              // ... Medyscan Card styling ...
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 170, // Adjust width as needed
+                height: 67,
+                decoration: BoxDecoration(
+                  color:
+                      _selectedRecordType == "Medyscan"
+                          ? Color(0xFFE1F5F3)
+                          : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [/* ... shadows ... */],
+                ),
+                child: Row(
+                  /* ... Medyscan content ... */
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Image.asset(
+                        'assets/homescreen/medyscan.png', // This icon is used for the Medyscan tab
+                        width: 42,
+                        height: 42,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Medyscan', // This is the filter name
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color:
+                            _selectedRecordType == "Medyscan"
+                                ? Color(0xFF00796B)
+                                : Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -432,6 +734,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     required String title,
     required VoidCallback onTap,
   }) {
+    // ... (Your existing _buildUploadOption code)
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -455,45 +758,97 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
   }
 
   Widget _buildRecordsList() {
-    // Filter records based on selected type
-    final filteredRecords =
-        records
-            .where((record) => record.recordType == _selectedRecordType)
-            .toList();
-
-    if (filteredRecords.isEmpty) {
-      return Center(
-        child: Text(
-          'No ${_selectedRecordType == "OPD" ? "OPD" : "Tele-consultation"} records yet',
-          style: GoogleFonts.poppins(fontSize: 14, color: Colors.black38),
-        ),
+    if (_selectedRecordType == "Medyscan") {
+      if (_isLoadingMedyscanRecords) {
+        return Center(child: CircularProgressIndicator());
+      }
+      if (_medyscanSessionRecords.isEmpty) {
+        return Center(
+          child: Text(
+            'No Medyscan sessions recorded yet.\nGo to the Medyscan tab to record a session.',
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black38),
+            textAlign: TextAlign.center,
+          ),
+        );
+      }
+      return ListView.builder(
+        itemCount: _medyscanSessionRecords.length,
+        itemBuilder: (context, index) {
+          final recording = _medyscanSessionRecords[index];
+          return _buildMedyscanSessionItem(recording);
+        },
+      );
+    } else {
+      // OPD or Tele
+      final filteredRecords =
+          records
+              .where((record) => record.recordType == _selectedRecordType)
+              .toList();
+      if (filteredRecords.isEmpty) {
+        return Center(
+          child: Text(
+            'No ${_selectedRecordType} records yet',
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black38),
+          ),
+        );
+      }
+      return ListView.builder(
+        itemCount: filteredRecords.length,
+        itemBuilder: (context, index) {
+          final record = filteredRecords[index];
+          return _buildRecordItem(
+            record,
+            index,
+          ); // Your existing item builder for OPD/Tele
+        },
       );
     }
+  }
 
-    return ListView.builder(
-      itemCount: filteredRecords.length,
-      itemBuilder: (context, index) {
-        final record = filteredRecords[index];
-        return _buildRecordItem(record, index);
-      },
+  // New widget to display Medyscan session items
+  Widget _buildMedyscanSessionItem(VideoRecordingItem recording) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: ListTile(
+        leading: Icon(
+          Icons.video_library_rounded,
+          color: Color(0xFF00796B),
+          size: 36,
+        ),
+        title: Text(
+          recording.fileName,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w500, fontSize: 14),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+        subtitle: Text(
+          '${DateFormat.yMMMd().add_jm().format(recording.dateRecorded)}\nDuration: ${_formatDuration(recording.duration.inSeconds)}',
+          style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[700]),
+        ),
+        trailing: IconButton(
+          icon: Icon(
+            Icons.delete_outline,
+            color: Colors.redAccent.shade100,
+          ), // Ensure shade100 for safety
+          onPressed: () => _confirmDeleteMedyscanRecording(recording),
+        ),
+        onTap: () => _playMedyscanVideo(recording.filePath),
+        isThreeLine: true,
+      ),
     );
   }
 
   Widget _buildRecordItem(MedicalRecordItem record, int index) {
+    // ... (Your existing _buildRecordItem code for OPD/Tele)
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        boxShadow: [/* ... shadows ... */],
       ),
       child: Row(
         children: [
@@ -559,6 +914,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -585,17 +941,14 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -617,7 +970,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -625,7 +978,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -634,13 +987,15 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -670,7 +1025,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }
@@ -700,8 +1055,9 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     );
   }
 
-  // File interaction methods
+  // File interaction methods for OPD/Tele
   Future<void> _takePhoto() async {
+    /* ... your existing code ... */
     try {
       final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
       if (photo != null) {
@@ -713,6 +1069,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
   }
 
   Future<void> _pickImage() async {
+    /* ... your existing code ... */
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
@@ -723,13 +1080,11 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     }
   }
 
-  // Use image_picker for documents too, as a workaround for file_picker issues
   Future<void> _pickDocument() async {
+    /* ... your existing code ... */
     try {
-      // Use image picker but set mediaType to allow any kind of media
       final XFile? document = await _picker.pickMedia();
       if (document != null) {
-        // Determine if it's an image or other document based on extension
         final extension = path.extension(document.path).toLowerCase();
         final isImage = [
           '.jpg',
@@ -739,7 +1094,6 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
           '.webp',
           '.heic',
         ].contains(extension);
-
         _addRecord(File(document.path), isImage ? 'image' : 'document');
       }
     } catch (e) {
@@ -748,16 +1102,13 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
   }
 
   void _addRecord(File file, String type) {
-    // Get filename from path
+    /* ... your existing code ... */
     String fileName = file.path.split('/').last;
     if (fileName.length > 30) {
       fileName = fileName.substring(0, 27) + '...';
     }
-
-    // Get current date
     DateTime now = DateTime.now();
     String date = '${now.day}/${now.month}/${now.year}';
-
     setState(() {
       records.add(
         MedicalRecordItem(
@@ -765,19 +1116,21 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
           date: date,
           type: type,
           file: file,
-          recordType: _selectedRecordType,
+          recordType: _selectedRecordType, // Ensure this is OPD or Tele
         ),
       );
     });
   }
 
   void _deleteRecord(MedicalRecordItem record) {
+    /* ... your existing code ... */
     setState(() {
       records.removeWhere((item) => item.file.path == record.file.path);
     });
   }
 
   void _showErrorDialog(String message) {
+    /* ... your existing code ... */
     showDialog(
       context: context,
       builder:

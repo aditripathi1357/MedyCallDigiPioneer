@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/profile/profile.dart';
 import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/History/history.dart';
@@ -555,16 +556,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
               },
             ),
             const SizedBox(width: 8),
-            Builder(
-              builder:
-                  (context) => _buildIcon(
-                    assetPath: 'assets/homescreen/menu.png',
-                    index: 2,
-                    onTap: () {
-                      Scaffold.of(context).openDrawer();
-                    },
-                  ),
-            ),
           ],
         ),
       ],
@@ -622,6 +613,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -648,17 +640,14 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -680,7 +669,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -688,7 +677,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -697,13 +686,15 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -733,7 +724,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

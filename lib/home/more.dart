@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/History/history.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/SpecialtyDoctors.dart';
-import 'package:medycall/home/Speciality/changelocation.dart'; // Import the specialty doctors page
+import 'package:medycall/home/Speciality/changelocation.dart';
+import 'package:medycall/home/home_screen.dart'; // Import the specialty doctors page
 
 class MoreSpecialties extends StatefulWidget {
   const MoreSpecialties({super.key});
@@ -124,7 +128,7 @@ class _MoreSpecialtiesState extends State<MoreSpecialties> {
           ),
         ),
       ),
-      bottomNavigationBar: buildBottomNavigationBar(),
+      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
@@ -256,12 +260,13 @@ class _MoreSpecialtiesState extends State<MoreSpecialties> {
     );
   }
 
-  Widget buildBottomNavigationBar() {
+  Widget _buildBottomNavigationBar() {
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -288,17 +293,14 @@ class _MoreSpecialtiesState extends State<MoreSpecialties> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -320,7 +322,7 @@ class _MoreSpecialtiesState extends State<MoreSpecialties> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -328,7 +330,7 @@ class _MoreSpecialtiesState extends State<MoreSpecialties> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -337,21 +339,47 @@ class _MoreSpecialtiesState extends State<MoreSpecialties> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
-              if (index == 0) {
-                Navigator.pop(context); // Go back to Home screen
-              } else if (index != 2) {
-                // Skip the center item
+              if (index != 2) {
                 setState(() {
                   _selectedIndex = index;
                 });
+
+                // Navigate based on index
+                if (index == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                } else if (index == 1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AppointmentScreen(),
+                    ),
+                  );
+                } else if (index == 3) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MedicalHistoryPage(),
+                    ),
+                  );
+                } else if (index == 4) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
+                  );
+                }
               }
             },
           ),

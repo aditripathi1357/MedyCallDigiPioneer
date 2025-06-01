@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/changelocation.dart';
 import 'package:medycall/Appointment/appointment.dart';
 import 'package:medycall/home/profile/profile.dart';
@@ -8,6 +9,8 @@ import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/home/Speciality/bookslot.dart';
 import 'package:medycall/home/payment/coupon.dart';
 import 'package:medycall/home/payment/makepayment.dart';
+import 'package:medycall/providers/user_provider.dart';
+import 'package:provider/provider.dart';
 
 class AppointmentSummaryScreen extends StatefulWidget {
   const AppointmentSummaryScreen({Key? key}) : super(key: key);
@@ -22,6 +25,8 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final userName = userProvider.user?.name ?? 'Guest';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -48,7 +53,7 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
                       const SizedBox(height: 20),
                       buildSectionHeader('patient Details'),
                       const SizedBox(height: 12),
-                      buildDetailRow('Patient Name', 'User12345'),
+                      buildDetailRow('Patient Name', userName),
                       const SizedBox(height: 12),
                       buildDetailRow('Contact Number', '+91 11111 11111'),
                       const SizedBox(height: 16),
@@ -384,6 +389,7 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -410,17 +416,14 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -442,7 +445,7 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -450,7 +453,7 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -459,13 +462,15 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -495,7 +500,7 @@ class _AppointmentSummaryScreenState extends State<AppointmentSummaryScreen> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/History/history.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/home/profile/lifestyle.dart'; // Assuming LifestyleForm is correctly named and located
 import 'package:medycall/services/user_service.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +20,7 @@ class DemographicDataScreen extends StatefulWidget {
 }
 
 class _DemographicDataScreenState extends State<DemographicDataScreen> {
-  int _selectedIndex = 4; // Profile is selected
+  int _selectedIndex = 1; // Profile is selected
   final _formKey = GlobalKey<FormState>();
   final UserService _userService = UserService();
   bool _isLoading = false;
@@ -904,6 +908,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -930,22 +935,19 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
-              const BottomNavigationBarItem(
-                icon: SizedBox(width: 24, height: 24),
+              BottomNavigationBarItem(
+                icon: const SizedBox(width: 24, height: 24),
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
@@ -962,7 +964,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -970,7 +972,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -979,34 +981,68 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
-                // Assuming 2 is the NIROG button index and should not change screen via bottom nav
-                setState(() => _selectedIndex = index);
-                // Add navigation logic here if needed based on index
+                setState(() {
+                  _selectedIndex = index;
+                });
+
+                // Navigate based on index
+                if (index == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                } else if (index == 1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AppointmentScreen(),
+                    ),
+                  );
+                } else if (index == 3) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MedicalHistoryPage(),
+                    ),
+                  );
+                } else if (index == 4) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
+                  );
+                }
               }
             },
           ),
         ),
+        // Centered NIROG image
         Positioned(
           top: -20,
-          child: GestureDetector(
-            onTap: () {
-              print('NIROG button tapped from Demographic Screen');
-              // Add navigation or action for NIROG button
-            },
-            child: Image.asset(
-              'assets/homescreen/nirog.png',
-              width: 51,
-              height: 54,
-            ),
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  print('NIROG tapped');
+                  // Add your NIROG button action here
+                },
+                child: Image.asset(
+                  'assets/homescreen/nirog.png',
+                  width: 51,
+                  height: 54,
+                ),
+              ),
+            ],
           ),
         ),
       ],

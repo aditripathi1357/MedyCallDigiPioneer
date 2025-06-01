@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/History/history.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/home/profile/medical.dart'; // Ensure this is the correct path to your MedicalInfoScreen
 import 'package:medycall/services/user_service.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +18,7 @@ class LifestyleForm extends StatefulWidget {
 }
 
 class _LifestyleFormState extends State<LifestyleForm> {
-  int _selectedIndex = 4; // Profile is selected in bottom nav
+  int _selectedIndex = 1; // Profile is selected in bottom nav
   bool _isLoading = false;
   final UserService _userService = UserService();
 
@@ -515,6 +519,7 @@ class _LifestyleFormState extends State<LifestyleForm> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -541,22 +546,19 @@ class _LifestyleFormState extends State<LifestyleForm> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
-              const BottomNavigationBarItem(
-                icon: SizedBox(width: 24, height: 24),
+              BottomNavigationBarItem(
+                icon: const SizedBox(width: 24, height: 24),
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
@@ -573,7 +575,7 @@ class _LifestyleFormState extends State<LifestyleForm> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -581,7 +583,7 @@ class _LifestyleFormState extends State<LifestyleForm> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -590,30 +592,68 @@ class _LifestyleFormState extends State<LifestyleForm> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
-                setState(() => _selectedIndex = index);
-                // Add navigation logic if needed
+                setState(() {
+                  _selectedIndex = index;
+                });
+
+                // Navigate based on index
+                if (index == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                } else if (index == 1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AppointmentScreen(),
+                    ),
+                  );
+                } else if (index == 3) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MedicalHistoryPage(),
+                    ),
+                  );
+                } else if (index == 4) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
+                  );
+                }
               }
             },
           ),
         ),
+        // Centered NIROG image
         Positioned(
           top: -20,
-          child: GestureDetector(
-            onTap: () => print('NIROG tapped from Lifestyle Screen'),
-            child: Image.asset(
-              'assets/homescreen/nirog.png',
-              width: 51,
-              height: 54,
-            ),
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  print('NIROG tapped');
+                  // Add your NIROG button action here
+                },
+                child: Image.asset(
+                  'assets/homescreen/nirog.png',
+                  width: 51,
+                  height: 54,
+                ),
+              ),
+            ],
           ),
         ),
       ],

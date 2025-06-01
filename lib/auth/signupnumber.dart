@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:medycall/auth/otpnumber.dart';
 import 'package:medycall/auth/signupemail.dart';
 import 'package:medycall/auth/signin.dart';
+import 'package:medycall/home/home_screen.dart';
 
 class Signupnumber extends StatefulWidget {
   const Signupnumber({super.key});
@@ -310,7 +311,14 @@ class _SignUpNumberState extends State<Signupnumber> {
                           width: double.infinity,
                           height: 43,
                           child: ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const HomeScreen(),
+                                ),
+                              );
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               side: const BorderSide(color: Color(0xFF086861)),

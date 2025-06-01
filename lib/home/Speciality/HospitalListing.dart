@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/SpecialtyDoctors.dart';
 import 'package:medycall/home/Speciality/changelocation.dart';
 import 'package:medycall/home/Speciality/HospitalProfile.dart';
 import 'package:medycall/Appointment/appointment.dart';
+import 'package:medycall/home/filter.dart';
 import 'package:medycall/home/profile/profile.dart';
 import 'package:medycall/History/history.dart';
 import 'package:medycall/home/home_screen.dart';
@@ -49,6 +51,15 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
     'area': 'Patel Colony',
     'city': 'Junagadh',
   };
+  FilterData filterData = FilterData();
+
+  // Add this method
+  void _onFilterApplied(FilterData newFilterData) {
+    setState(() {
+      filterData = newFilterData;
+    });
+    // Your filter logic here
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +139,20 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                   const SizedBox(width: 4),
                   IconButton(
                     onPressed: () {
-                      // Handle filter button tap
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        builder:
+                            (context) => FilterSheet(
+                              initialFilterData: filterData,
+                              onApplyFilters: _onFilterApplied,
+                            ),
+                      );
                     },
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
@@ -289,12 +313,13 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
             Expanded(
               child: GestureDetector(
                 onTap: () {
-                  Navigator.push(
+                  // Navigate to Doctor page
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder:
                           (context) =>
-                              SpecialtyDoctorsPage(specialty: 'Hospital'),
+                              SpecialtyDoctorsPage(specialty: widget.specialty),
                     ),
                   );
                 },
@@ -302,19 +327,17 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
                     color:
-                        _selectedTab == 0
-                            ? const Color(0xFF00796B)
-                            : Colors.transparent,
+                        Colors
+                            .transparent, // Not selected since we're on Hospital page
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Text(
                       'Doctor',
                       style: GoogleFonts.poppins(
-                        color:
-                            _selectedTab == 0
-                                ? Colors.white
-                                : const Color(0xFF00796B),
+                        color: const Color(
+                          0xFF00796B,
+                        ), // Teal color for unselected
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -325,14 +348,18 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
             ),
             Expanded(
               child: GestureDetector(
-                onTap: () {},
+                onTap: () {
+                  // Hospital tab is already selected, no navigation needed
+                  setState(() {
+                    _selectedTab = 1;
+                  });
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color:
-                        _selectedTab == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.transparent,
+                    color: const Color(
+                      0xFF00796B,
+                    ), // Always selected since we're on Hospital page
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
@@ -340,9 +367,7 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                       'Hospital',
                       style: GoogleFonts.poppins(
                         color:
-                            _selectedTab == 1
-                                ? Colors.white
-                                : const Color(0xFF00796B),
+                            Colors.white, // Always white since always selected
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -723,7 +748,14 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                       ),
                       padding: EdgeInsets.zero,
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => HospitalProfileScreen(),
+                        ),
+                      );
+                    },
                     child: Text(
                       'See Specialty',
                       style: GoogleFonts.poppins(
@@ -762,7 +794,14 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                   width: 80,
                   height: 30,
                   child: InkWell(
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => HospitalProfileScreen(),
+                        ),
+                      );
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
@@ -795,6 +834,7 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -821,17 +861,14 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -853,7 +890,7 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/profile.png',
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -861,7 +898,7 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                           ? const Color(0xFF00796B)
                           : Colors.grey,
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -870,13 +907,15 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
@@ -906,7 +945,7 @@ class _HospitalListingScreenState extends State<HospitalListingScreen> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

@@ -2,14 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:medycall/auth/signin.dart';
+import 'package:medycall/home/menu/diet.dart';
+import 'package:medycall/home/menu/waterintake.dart';
+import 'package:medycall/home/menu/yoga.dart';
 import 'package:medycall/home/profile/profile.dart';
 import 'package:medycall/home/menu/fingerprint.dart';
 import 'package:medycall/providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class MenuDrawer extends StatelessWidget {
+class MenuDrawer extends StatefulWidget {
   const MenuDrawer({super.key});
+
+  @override
+  State<MenuDrawer> createState() => _MenuDrawerState();
+}
+
+class _MenuDrawerState extends State<MenuDrawer> {
+  bool _isHealthTrackerExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -107,11 +117,56 @@ class MenuDrawer extends StatelessWidget {
                     title: 'Wallet',
                     onTap: () {},
                   ),
-                  _buildMenuItem(
+                  // Health Tracker with expandable submenu
+                  _buildExpandableMenuItem(
                     icon: Image.asset('assets/menu/menu_refer.png'),
-                    title: 'Refer',
-                    onTap: () {},
+                    title: 'Health Tracker',
+                    isExpanded: _isHealthTrackerExpanded,
+                    onTap: () {
+                      setState(() {
+                        _isHealthTrackerExpanded = !_isHealthTrackerExpanded;
+                      });
+                    },
                   ),
+                  // Health Tracker submenu items
+                  if (_isHealthTrackerExpanded) ...[
+                    _buildSubMenuItem(
+                      title: 'Water Intake',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const WaterReminderPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildSubMenuItem(
+                      title: 'Yoga',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const YogaPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildSubMenuItem(
+                      title: 'Diet Plan',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MealTrackerPage(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   _buildMenuItem(
                     icon: Image.asset('assets/menu/Fingerprint.png'),
                     title: 'Fingerprint Password',
@@ -209,6 +264,71 @@ class MenuDrawer extends StatelessWidget {
       ),
       trailing: const Icon(Icons.chevron_right, color: Color(0xFF018C7E)),
       onTap: onTap,
+    );
+  }
+
+  Widget _buildExpandableMenuItem({
+    required Widget icon,
+    required String title,
+    required bool isExpanded,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: SizedBox(
+        width: 24,
+        height: 24,
+        child: ColorFiltered(
+          colorFilter: const ColorFilter.mode(
+            Color(0xFF018C7E),
+            BlendMode.srcIn,
+          ),
+          child: icon,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontFamily: 'Roboto',
+          fontSize: 13,
+          fontWeight: FontWeight.w300,
+          height: 21.5 / 13, // Calculated line height (21.5px / 13px)
+          letterSpacing: 0.11,
+          color: Colors.black,
+        ),
+      ),
+      trailing: Icon(
+        isExpanded ? Icons.expand_less : Icons.expand_more,
+        color: Color(0xFF018C7E),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildSubMenuItem({
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(left: 20),
+      child: ListTile(
+        leading: const SizedBox(
+          width: 24,
+          height: 24,
+          child: Icon(Icons.circle, size: 6, color: Color(0xFF018C7E)),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 12,
+            fontWeight: FontWeight.w300,
+            height: 21.5 / 12,
+            letterSpacing: 0.11,
+            color: Colors.black87,
+          ),
+        ),
+        onTap: onTap,
+      ),
     );
   }
 }
