@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:medycall/models/user_model.dart';
+import 'package:medycall/models/user_model.dart'; // Assuming this path is correct
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserService {
-  static const String _baseUrl = 'http://192.168.29.104:3000/api/users';
+  static const String _baseUrl =
+      'http://192.168.29.104:3000/api/users'; // Ensure this is your correct API base URL
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // Get current user's Supabase UID
@@ -20,7 +21,7 @@ class UserService {
     return user?.email;
   }
 
-  // Get common headers (no authentication needed for API)
+  // Get common headers
   Map<String, String> _getHeaders() {
     return {'Content-Type': 'application/json', 'Accept': 'application/json'};
   }
@@ -30,14 +31,14 @@ class UserService {
     return phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '').trim();
   }
 
-  // Check if user profile exists
-  Future<bool> userExists() async {
+  // Check if user profile exists in the backend
+  Future<bool> userExistsInBackend() async {
     try {
-      final user = await getUserProfile();
+      final user = await getUserProfile(); // This hits the backend
       return user != null;
     } catch (e) {
-      print('Error checking if user exists: $e');
-      return false;
+      print('Error checking if user exists in backend: $e');
+      return false; // Assuming error means not found or inaccessible
     }
   }
 
@@ -59,7 +60,6 @@ class UserService {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Clean phone numbers
       final cleanContactNumber = _cleanPhoneNumber(contactNumber);
       final cleanAlternateNumber =
           alternateNumber != null ? _cleanPhoneNumber(alternateNumber) : null;
@@ -76,9 +76,11 @@ class UserService {
         if (weight != null) 'weight': weight,
         if (maritalStatus != null) 'maritalStatus': maritalStatus,
         'contactNumber': cleanContactNumber,
-        if (cleanAlternateNumber != null)
+        if (cleanAlternateNumber != null && cleanAlternateNumber.isNotEmpty)
           'alternateNumber': cleanAlternateNumber,
       };
+      // Remove null values before saving
+      demographicData.removeWhere((key, value) => value == null);
 
       await prefs.setString('demographic_data', jsonEncode(demographicData));
       print('Demographic data saved locally');
@@ -107,6 +109,8 @@ class UserService {
         if (dietHabit != null) 'dietHabit': dietHabit,
         if (occupation != null) 'occupation': occupation,
       };
+      // Remove null values before saving
+      lifestyleData.removeWhere((key, value) => value == null);
 
       await prefs.setString('lifestyle_data', jsonEncode(lifestyleData));
       print('Lifestyle data saved locally');
@@ -149,7 +153,7 @@ class UserService {
       final prefs = await SharedPreferences.getInstance();
       final dataString = prefs.getString('demographic_data');
       if (dataString != null) {
-        return jsonDecode(dataString);
+        return jsonDecode(dataString) as Map<String, dynamic>;
       }
       return null;
     } catch (e) {
@@ -163,7 +167,7 @@ class UserService {
       final prefs = await SharedPreferences.getInstance();
       final dataString = prefs.getString('lifestyle_data');
       if (dataString != null) {
-        return jsonDecode(dataString);
+        return jsonDecode(dataString) as Map<String, dynamic>;
       }
       return null;
     } catch (e) {
@@ -177,7 +181,7 @@ class UserService {
       final prefs = await SharedPreferences.getInstance();
       final dataString = prefs.getString('medical_data');
       if (dataString != null) {
-        return jsonDecode(dataString);
+        return jsonDecode(dataString) as Map<String, dynamic>;
       }
       return null;
     } catch (e) {
@@ -194,19 +198,21 @@ class UserService {
         throw Exception('User not authenticated. Please login again.');
       }
 
-      // Get all locally stored data
       final demographicData = await getLocalDemographicData();
       final lifestyleData = await getLocalLifestyleData();
       final medicalData = await getLocalMedicalData();
 
-      if (demographicData == null) {
-        throw Exception('Demographic data is required');
+      if (demographicData == null ||
+          demographicData['email'] == null ||
+          demographicData['name'] == null) {
+        // Basic validation, ensure core demographic fields are present
+        throw Exception(
+          'Essential demographic data (email, name) is required to submit.',
+        );
       }
 
-      // Combine all data into a single request body
       final requestBody = {
         'supabaseUid': currentUserUid,
-        // Flatten all the data - no nested structure
         ...demographicData,
         if (lifestyleData != null) ...lifestyleData,
         if (medicalData != null) ...medicalData,
@@ -225,14 +231,13 @@ class UserService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
-
-        // Check if response has 'user' field or direct user data
         final userData = responseData['user'] ?? responseData;
+        final userModel = UserModel.fromJson(userData);
 
-        // Clear local storage after successful submission
-        await clearLocalData();
+        // IMPORTANT: After successful submission, sync server data back to local
+        await _saveUserModelToLocal(userModel);
 
-        return UserModel.fromJson(userData);
+        return userModel;
       } else {
         final errorMessage = _extractErrorMessage(response.body);
         throw Exception(
@@ -245,8 +250,9 @@ class UserService {
     }
   }
 
-  // Save or update demographic data (direct API call - if needed for individual updates)
-  Future<UserModel?> saveDemographicData({
+  // Save or update demographic data (direct API call)
+  // This method is for individual updates if necessary, typically after initial profile creation.
+  Future<UserModel?> saveDemographicDataToServer({
     required String email,
     String? phone,
     String? title,
@@ -266,7 +272,6 @@ class UserService {
         throw Exception('User not authenticated. Please login again.');
       }
 
-      // Clean phone numbers
       final cleanContactNumber = _cleanPhoneNumber(contactNumber);
       final cleanAlternateNumber =
           alternateNumber != null ? _cleanPhoneNumber(alternateNumber) : null;
@@ -288,53 +293,46 @@ class UserService {
         if (weight != null) 'weight': weight,
         if (maritalStatus != null) 'maritalStatus': maritalStatus,
         'contactNumber': cleanContactNumber,
-        if (cleanAlternateNumber != null)
+        if (cleanAlternateNumber != null && cleanAlternateNumber.isNotEmpty)
           'alternateNumber': cleanAlternateNumber,
       };
+      requestBody.removeWhere((key, value) => value == null);
 
-      print('Saving demographic data: ${jsonEncode(requestBody)}');
+      print('Saving demographic data to server: ${jsonEncode(requestBody)}');
 
-      // Check if user exists to determine if we should POST or PUT
-      final userExistsFlag = await userExists();
-      final method = userExistsFlag ? 'PUT' : 'POST';
-
-      http.Response response;
-      if (method == 'PUT') {
-        response = await http.put(
-          Uri.parse(_baseUrl),
-          headers: _getHeaders(),
-          body: jsonEncode(requestBody),
-        );
-      } else {
-        response = await http.post(
-          Uri.parse(_baseUrl),
-          headers: _getHeaders(),
-          body: jsonEncode(requestBody),
-        );
-      }
+      // User profile might exist or not. API handles upsert via POST or specific PUT.
+      // The current route.ts POST does upsert. PUT is for general updates.
+      // For simplicity using POST which handles create/update based on supabaseUid.
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: _getHeaders(),
+        body: jsonEncode(requestBody),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
         final userData = responseData['user'] ?? responseData;
-        return UserModel.fromJson(userData);
+        final userModel = UserModel.fromJson(userData);
+        await _saveUserModelToLocal(userModel); // Sync back
+        return userModel;
       } else {
         final errorMessage = _extractErrorMessage(response.body);
         throw Exception(
-          'Failed to save demographic data (${response.statusCode}): $errorMessage',
+          'Failed to save demographic data to server (${response.statusCode}): $errorMessage',
         );
       }
     } catch (e) {
-      print('Error saving demographic data: $e');
+      print('Error saving demographic data to server: $e');
       rethrow;
     }
   }
 
-  // Get user profile
+  // Get user profile from backend
   Future<UserModel?> getUserProfile() async {
     try {
       final currentUserUid = getCurrentUserUid();
       if (currentUserUid == null) {
-        print('User not authenticated');
+        print('User not authenticated for getUserProfile');
         return null;
       }
 
@@ -343,115 +341,133 @@ class UserService {
         headers: _getHeaders(),
       );
 
-      print('Get profile response: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('Get profile response status: ${response.statusCode}');
+      // print('Get profile response body: ${response.body}'); // Potentially verbose
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        final userData = responseData['user'] ?? responseData;
-        return UserModel.fromJson(userData);
+        // The API returns { success: true, user: {...} }
+        if (responseData['success'] == true && responseData['user'] != null) {
+          return UserModel.fromJson(responseData['user']);
+        } else if (responseData['user'] != null) {
+          // Fallback if 'success' isn't there but 'user' is
+          return UserModel.fromJson(responseData['user']);
+        }
+        // If structure is just the user object directly
+        // return UserModel.fromJson(responseData);
+        print('User data not found in expected structure in response.');
+        return null;
       } else if (response.statusCode == 404) {
-        // User not found, return null
-        print('User profile not found (404)');
+        print('User profile not found on server (404)');
         return null;
       } else {
         final errorMessage = _extractErrorMessage(response.body);
-        throw Exception(
+        print(
           'Failed to get user profile (${response.statusCode}): $errorMessage',
         );
+        return null; // Return null on error instead of throwing to allow graceful handling
       }
     } catch (e) {
       print('Error getting user profile: $e');
-      return null;
+      return null; // Return null on exception
     }
   }
 
-  // Update specific fields (helper method)
-  Future<UserModel?> updateUserField(Map<String, dynamic> updates) async {
+  // Update specific fields (generic PUT request)
+  Future<UserModel?> updateUserFields(Map<String, dynamic> updates) async {
     try {
       final currentUserUid = getCurrentUserUid();
       if (currentUserUid == null) {
         throw Exception('User not authenticated. Please login again.');
       }
 
-      // Add supabaseUid to updates
-      updates['supabaseUid'] = currentUserUid;
+      final requestBody = {'supabaseUid': currentUserUid, ...updates};
+      // It's good practice to ensure email isn't accidentally changed this way
+      // unless specifically intended by the `updates` map.
+      // The PUT request in route.ts allows updating by supabaseUid or email.
 
-      print('Updating user fields: ${jsonEncode(updates)}');
+      print('Updating user fields on server: ${jsonEncode(requestBody)}');
 
       final response = await http.put(
-        Uri.parse(_baseUrl),
+        Uri.parse(
+          _baseUrl,
+        ), // Assumes PUT to base URL with supabaseUid handles update
         headers: _getHeaders(),
-        body: jsonEncode(updates),
+        body: jsonEncode(requestBody),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
         final userData = responseData['user'] ?? responseData;
-        return UserModel.fromJson(userData);
+        final userModel = UserModel.fromJson(userData);
+        await _saveUserModelToLocal(userModel); // Sync back
+        return userModel;
       } else {
         final errorMessage = _extractErrorMessage(response.body);
         throw Exception(
-          'Failed to update user fields (${response.statusCode}): $errorMessage',
+          'Failed to update user fields on server (${response.statusCode}): $errorMessage',
         );
       }
     } catch (e) {
-      print('Error updating user fields: $e');
+      print('Error updating user fields on server: $e');
       rethrow;
     }
   }
 
-  // Clear all local storage data
+  // Clear all local SharedPreferences data related to user forms
   Future<void> clearLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('demographic_data');
       await prefs.remove('lifestyle_data');
       await prefs.remove('medical_data');
-      print('Local data cleared');
+      print('Local user form data cleared');
     } catch (e) {
       print('Error clearing local data: $e');
     }
   }
 
-  // Helper method to extract error messages from response
+  // Helper method to extract error messages from API response
   String _extractErrorMessage(String responseBody) {
     try {
       final Map<String, dynamic> errorData = jsonDecode(responseBody);
-      return errorData['message'] ?? errorData['error'] ?? responseBody;
+      return errorData['error'] ??
+          errorData['details'] ??
+          errorData['message'] ??
+          responseBody;
     } catch (e) {
+      // If parsing fails, return the raw response body
       return responseBody;
     }
   }
 
-  // Sign out and clear data
+  // Sign out: clears Supabase session and local data
   Future<void> signOut() async {
     try {
       await _supabase.auth.signOut();
-      await clearLocalData();
+      await clearLocalData(); // Clear local form data on sign out
+      print('User signed out and local data cleared.');
     } catch (e) {
       print('Error signing out: $e');
       rethrow;
     }
   }
 
-  // Get specific data sections from stored user
-  Future<Map<String, dynamic>?> getDemographicData() async {
-    final user = await getUserProfile();
-    return user?.getDemographicData();
+  // Get specific data sections from locally stored UserModel (if available)
+  // These methods now primarily rely on local SharedPreferences.
+  Future<Map<String, dynamic>?> getDemographicDataFromLocal() async {
+    return await getLocalDemographicData();
   }
 
-  Future<Map<String, dynamic>?> getLifestyleData() async {
-    final user = await getUserProfile();
-    return user?.getLifestyleData();
+  Future<Map<String, dynamic>?> getLifestyleDataFromLocal() async {
+    return await getLocalLifestyleData();
   }
 
-  Future<Map<String, dynamic>?> getMedicalData() async {
-    final user = await getUserProfile();
-    return user?.getMedicalData();
+  Future<Map<String, dynamic>?> getMedicalDataFromLocal() async {
+    return await getLocalMedicalData();
   }
 
-  // Check if all forms are filled locally
+  // Check status of locally filled forms
   Future<Map<String, bool>> checkLocalFormsStatus() async {
     return {
       'demographic': await getLocalDemographicData() != null,
@@ -460,72 +476,142 @@ class UserService {
     };
   }
 
-  // Get progress percentage
+  // Calculate form completion progress based on local data
   Future<double> getFormProgress() async {
     final status = await checkLocalFormsStatus();
     final completedForms = status.values.where((completed) => completed).length;
-    return completedForms / 3.0; // 3 total forms
+    return completedForms / 3.0; // Assuming 3 main forms/sections
   }
 
-  // Method to save demographic data from UserProvider to SharedPreferences
-  Future<void> saveDemographicFromProvider(
+  // --- Methods to save data from a Provider/State to SharedPreferences ---
+  // These are used by syncUserProfileToLocal or if a UserProvider updates local storage
+  Future<void> saveDemographicMapToLocal(
     Map<String, dynamic> demographicData,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Ensure essential fields like email/name are present if expected by forms
       await prefs.setString('demographic_data', jsonEncode(demographicData));
-      print('Demographic data saved from provider to SharedPreferences');
+      print('Demographic map saved to SharedPreferences');
     } catch (e) {
-      print('Error saving demographic data from provider: $e');
+      print('Error saving demographic map to SharedPreferences: $e');
       rethrow;
     }
   }
 
-  // Method to save lifestyle data from UserProvider to SharedPreferences
-  Future<void> saveLifestyleFromProvider(
+  Future<void> saveLifestyleMapToLocal(
     Map<String, dynamic> lifestyleData,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('lifestyle_data', jsonEncode(lifestyleData));
-      print('Lifestyle data saved from provider to SharedPreferences');
+      print('Lifestyle map saved to SharedPreferences');
     } catch (e) {
-      print('Error saving lifestyle data from provider: $e');
+      print('Error saving lifestyle map to SharedPreferences: $e');
       rethrow;
     }
   }
 
-  // Method to save medical data from UserProvider to SharedPreferences
-  Future<void> saveMedicalFromProvider(Map<String, dynamic> medicalData) async {
+  Future<void> saveMedicalMapToLocal(Map<String, dynamic> medicalData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('medical_data', jsonEncode(medicalData));
-      print('Medical data saved from provider to SharedPreferences');
+      print('Medical map saved to SharedPreferences');
     } catch (e) {
-      print('Error saving medical data from provider: $e');
+      print('Error saving medical map to SharedPreferences: $e');
       rethrow;
     }
   }
 
-  // Comprehensive method to handle form completion flow
+  // --- NEW AND MODIFIED METHODS FOR SYNCING PROFILE ---
+
+  // Helper to save a complete UserModel's data to local SharedPreferences
+  Future<void> _saveUserModelToLocal(UserModel userModel) async {
+    try {
+      // Construct demographic map for local storage
+      Map<String, dynamic> demoDataForLocal = {
+        'email': userModel.email,
+        'phone': userModel.phone,
+        'title': userModel.title,
+        'name': userModel.name,
+        'birthDate': userModel.birthDate?.toIso8601String(),
+        'gender': userModel.gender,
+        'bloodGroup': userModel.bloodGroup,
+        'height': userModel.height,
+        'weight': userModel.weight,
+        'maritalStatus': userModel.maritalStatus,
+        'contactNumber': userModel.contactNumber,
+        'alternateNumber': userModel.alternateNumber,
+      };
+      demoDataForLocal.removeWhere((key, value) => value == null);
+      await saveDemographicMapToLocal(demoDataForLocal);
+
+      // Construct lifestyle map
+      Map<String, dynamic> lifestyleDataForLocal =
+          userModel.getLifestyleData(); // Uses UserModel's helper
+      lifestyleDataForLocal.removeWhere((key, value) => value == null);
+      await saveLifestyleMapToLocal(lifestyleDataForLocal);
+
+      // Construct medical map
+      Map<String, dynamic> medicalDataForLocal =
+          userModel.getMedicalData(); // Uses UserModel's helper
+      await saveMedicalMapToLocal(medicalDataForLocal);
+
+      print('UserModel data saved to local SharedPreferences.');
+    } catch (e) {
+      print('Error saving UserModel to local SharedPreferences: $e');
+      // Decide if rethrow is needed or just log.
+    }
+  }
+
+  // **KEY METHOD**: Fetches user profile from backend and populates local SharedPreferences.
+  // Call this after login or on app start if user is authenticated.
+  Future<UserModel?> syncUserProfileToLocal() async {
+    print('Attempting to sync user profile to local storage...');
+    try {
+      final userModel = await getUserProfile(); // Fetches from backend API
+
+      if (userModel != null) {
+        print(
+          'User profile fetched from server. UID: ${userModel.supabaseUid}',
+        );
+        await _saveUserModelToLocal(userModel);
+        print('User profile successfully synced to local storage.');
+        return userModel;
+      } else {
+        print('No user profile found on server to sync. Clearing local data.');
+        // If no profile on server, good idea to clear local data to avoid stale info.
+        // However, consider if user was halfway through filling forms offline - this would wipe it.
+        // For the scenario "data not showing after re-login", clearing is often desired.
+        await clearLocalData();
+        return null;
+      }
+    } catch (e) {
+      print('Error during syncUserProfileToLocal: $e');
+      // Potentially notify user or retry. For now, just log.
+      return null;
+    }
+  }
+
+  // Comprehensive method to handle form completion flow (modified to use server sync)
   Future<UserModel?> handleFormCompletionFlow({
-    Map<String, dynamic>? demographicData,
-    Map<String, dynamic>? lifestyleData,
-    Map<String, dynamic>? medicalData,
+    Map<String, dynamic>? demographicData, // Data from form page
+    Map<String, dynamic>? lifestyleData, // Data from form page
+    Map<String, dynamic>? medicalData, // Data from form page
   }) async {
     try {
-      // Save any provided data locally first
+      // Save any provided data to local SharedPreferences first
       if (demographicData != null) {
-        await saveDemographicFromProvider(demographicData);
+        // Ensure this map is structured correctly, similar to saveDemographicDataLocally
+        await saveDemographicMapToLocal(demographicData);
       }
       if (lifestyleData != null) {
-        await saveLifestyleFromProvider(lifestyleData);
+        await saveLifestyleMapToLocal(lifestyleData);
       }
       if (medicalData != null) {
-        await saveMedicalFromProvider(medicalData);
+        await saveMedicalMapToLocal(medicalData);
       }
 
-      // Check if all three forms are completed
       final formsStatus = await checkLocalFormsStatus();
       final allFormsCompleted =
           formsStatus['demographic']! &&
@@ -533,10 +619,15 @@ class UserService {
           formsStatus['medical']!;
 
       if (allFormsCompleted) {
-        // Submit all data to the API
+        print('All forms completed locally, submitting to server...');
+        // submitAllFormsData will combine local data, send to API, and then sync back.
         return await submitAllFormsData();
       } else {
-        print('Not all forms completed yet. Current status: $formsStatus');
+        print(
+          'Not all forms completed locally. Current status: $formsStatus. Data saved locally.',
+        );
+        // Return null, indicating data is saved locally but not submitted yet.
+        // The UI should reflect that data is saved but pending full completion/submission.
         return null;
       }
     } catch (e) {

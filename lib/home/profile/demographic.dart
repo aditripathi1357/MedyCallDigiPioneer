@@ -4,9 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:medycall/home/profile/lifestyle.dart'; // Assuming LifestyleForm is correctly named and located
 import 'package:medycall/services/user_service.dart';
-import 'package:provider/provider.dart'; // Added for UserProvider
-import 'package:medycall/providers/user_provider.dart'; // Added for UserProvider
-import 'package:medycall/models/user_model.dart'; // Added for UserModel type hint
+import 'package:provider/provider.dart';
+import 'package:medycall/providers/user_provider.dart';
+import 'package:medycall/models/user_model.dart';
 
 class DemographicDataScreen extends StatefulWidget {
   const DemographicDataScreen({Key? key}) : super(key: key);
@@ -62,6 +62,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
   }
 
   void _populateFieldsFromData(Map<String, dynamic> data) {
+    if (!mounted) return;
     setState(() {
       _title = data['title'] ?? _title;
       _name = data['name'] ?? _name;
@@ -69,7 +70,9 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
         try {
           _birthDate = DateTime.parse(data['birthDate']);
         } catch (e) {
-          print("Error parsing birthDate from data: ${data['birthDate']}");
+          print(
+            "DemographicDataScreen: Error parsing birthDate from data: ${data['birthDate']}, error: $e",
+          );
           // Keep default or current _birthDate
         }
       }
@@ -80,8 +83,9 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
       _maritalStatus = data['maritalStatus'] ?? _maritalStatus;
       _contactNumber = data['contactNumber'] ?? _contactNumber;
       _alternateNumber = data['alternateNumber'] ?? _alternateNumber;
-      // Email from loaded data takes precedence over auth email if available
-      _email = data['email'] ?? _email;
+      _email =
+          data['email'] ??
+          _email; // Loaded email overrides auth email if present
     });
   }
 
@@ -89,16 +93,13 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // Priority 1: UserProvider
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       UserModel? providerUser = userProvider.user;
       Map<String, dynamic>? providerDemographicData;
 
-      // Check if the user object in provider has actual profile data
       if (providerUser != null &&
           providerUser.supabaseUid != null &&
-          providerUser.name != null &&
-          providerUser.name!.isNotEmpty) {
+          (providerUser.name != null && providerUser.name!.isNotEmpty)) {
         providerDemographicData = providerUser.getDemographicData();
       }
 
@@ -107,7 +108,6 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
         print('DemographicDataScreen: Loading data from UserProvider');
         _populateFieldsFromData(providerDemographicData);
       } else {
-        // Priority 2: Local Storage (for in-progress forms)
         print(
           'DemographicDataScreen: UserProvider data not found or incomplete, trying local storage.',
         );
@@ -119,7 +119,6 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
           print(
             'DemographicDataScreen: No data in UserProvider or Local Storage. Using defaults/auth email.',
           );
-          // Fields will retain defaults or email from _initializeEmail if not overridden
         }
       }
     } catch (e) {
@@ -166,13 +165,13 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
 
   Future<void> _saveAndContinue() async {
     if (!_formKey.currentState!.validate()) return;
-    _formKey.currentState!.save(); // Ensure all onSaved callbacks are triggered
+    _formKey.currentState!.save();
 
     setState(() => _isLoading = true);
 
     try {
       await _userService.saveDemographicDataLocally(
-        email: _email,
+        email: _email, // email is now required in saveDemographicDataLocally
         title: _title,
         name: _name,
         birthDate: _birthDate,
@@ -184,7 +183,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
         height: _height.isNotEmpty ? int.tryParse(_height) : null,
         weight: _weight.isNotEmpty ? int.tryParse(_weight) : null,
         maritalStatus: _maritalStatus.isNotEmpty ? _maritalStatus : null,
-        contactNumber: _contactNumber,
+        contactNumber: _contactNumber, // contactNumber is required
         alternateNumber: _alternateNumber.isNotEmpty ? _alternateNumber : null,
       );
 
@@ -215,7 +214,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
   }
 
   Future<void> _skipForNow() async {
-    _formKey.currentState!.save(); // Save current values even if skipping
+    _formKey.currentState!.save();
 
     if (_name.isEmpty || _email.isEmpty || _contactNumber.isEmpty) {
       if (mounted) {
@@ -233,12 +232,14 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // Save the essential fields even when skipping
       await _userService.saveDemographicDataLocally(
         email: _email,
         name: _name,
-        birthDate: _birthDate,
-        gender: _gender,
+        birthDate: _birthDate, // Keep the selected or default birthdate
+        gender: _gender, // Keep the selected or default gender
         contactNumber: _contactNumber,
+        // Optional fields can be null or current values
         title: _title.isNotEmpty ? _title : null,
         bloodGroup:
             _bloodGroup.isNotEmpty && _bloodGroup != 'Unknown'
@@ -277,8 +278,8 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Initial loading condition for the main content
-    bool isStillInitializing = _isLoading && _name.isEmpty && _email.isEmpty;
+    bool isStillInitializing =
+        _isLoading && _name.isEmpty && _email.isEmpty && _contactNumber.isEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFF008D83),
@@ -359,9 +360,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: TextFormField(
-                                      key: ValueKey(
-                                        _name,
-                                      ), // Helps update if _name changes externally
+                                      key: ValueKey(_name),
                                       initialValue: _name,
                                       decoration: InputDecoration(
                                         border: OutlineInputBorder(
@@ -796,11 +795,8 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                               ),
                               const SizedBox(height: 40),
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
                                 children: [
                                   Expanded(
-                                    // Added Expanded
                                     child: ElevatedButton(
                                       onPressed:
                                           _isLoading ? null : _skipForNow,
@@ -817,10 +813,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                                             color: Color(0xFF008D83),
                                           ),
                                         ),
-                                        minimumSize: const Size(
-                                          0,
-                                          50,
-                                        ), // Adjusted
+                                        minimumSize: const Size(0, 50),
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 16,
                                           vertical: 12,
@@ -835,11 +828,8 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(
-                                    width: 16,
-                                  ), // Added SizedBox for spacing
+                                  const SizedBox(width: 16),
                                   Expanded(
-                                    // Added Expanded
                                     child: ElevatedButton(
                                       onPressed:
                                           _isLoading ? null : _saveAndContinue,
@@ -853,10 +843,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
                                             20,
                                           ),
                                         ),
-                                        minimumSize: const Size(
-                                          0,
-                                          50,
-                                        ), // Adjusted
+                                        minimumSize: const Size(0, 50),
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 16,
                                           vertical: 12,
@@ -1001,9 +988,9 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
             ),
             onTap: (index) {
               if (index != 2) {
-                setState(() {
-                  _selectedIndex = index;
-                });
+                // Assuming 2 is the NIROG button index and should not change screen via bottom nav
+                setState(() => _selectedIndex = index);
+                // Add navigation logic here if needed based on index
               }
             },
           ),
@@ -1013,6 +1000,7 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
           child: GestureDetector(
             onTap: () {
               print('NIROG button tapped from Demographic Screen');
+              // Add navigation or action for NIROG button
             },
             child: Image.asset(
               'assets/homescreen/nirog.png',

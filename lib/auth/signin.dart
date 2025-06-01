@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:medycall/auth/signupnumber.dart';
+import 'package:medycall/auth/otpemail.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -10,6 +12,127 @@ class SignInPage extends StatefulWidget {
 
 class _SignInPageState extends State<SignInPage> {
   bool showPhoneLogin = true;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+  final _supabase = Supabase.instance.client;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  // In your SignInPage, update the _handleEmailSignIn method:
+
+  Future<void> _handleEmailSignIn() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter your email address';
+      });
+      return;
+    }
+
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() {
+        _errorMessage = 'Please enter a valid email address';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Send OTP for sign in (not magic link)
+      await _supabase.auth.signInWithOtp(
+        email: email,
+        emailRedirectTo: null, // This prevents magic link generation
+        shouldCreateUser: false, // Don't create user if doesn't exist
+      );
+
+      if (mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Verification code sent to your email'),
+            backgroundColor: Color(0xFF086861),
+          ),
+        );
+
+        // Navigate to OTP verification page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => OtpEmail(
+                  email: email,
+                  name: '', // Empty name for sign in
+                  isSignUp: false, // This is sign in, not sign up
+                ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        if (e.toString().contains('User not found')) {
+          _errorMessage =
+              'No account found with this email. Please sign up first.';
+        } else {
+          _errorMessage = 'Failed to send verification code: ${e.toString()}';
+        }
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handlePhoneSignIn() async {
+    final phone = _phoneController.text.trim();
+
+    if (phone.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter your phone number';
+      });
+      return;
+    }
+
+    if (phone.length != 10) {
+      setState(() {
+        _errorMessage = 'Please enter a valid 10-digit phone number';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // For phone sign in, you would implement your phone OTP logic here
+      // This is a placeholder - implement according to your phone auth provider
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone sign in not implemented yet')),
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to send OTP: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +233,7 @@ class _SignInPageState extends State<SignInPage> {
                                 onPressed: () {
                                   setState(() {
                                     showPhoneLogin = true;
+                                    _errorMessage = null;
                                   });
                                 },
                                 child: Text(
@@ -137,6 +261,7 @@ class _SignInPageState extends State<SignInPage> {
                                 onPressed: () {
                                   setState(() {
                                     showPhoneLogin = false;
+                                    _errorMessage = null;
                                   });
                                 },
                                 child: Text(
@@ -159,6 +284,7 @@ class _SignInPageState extends State<SignInPage> {
                       // Conditional input field
                       showPhoneLogin
                           ? TextField(
+                            controller: _phoneController,
                             decoration: InputDecoration(
                               prefixIcon: const Padding(
                                 padding: EdgeInsets.only(
@@ -195,8 +321,17 @@ class _SignInPageState extends State<SignInPage> {
                             ),
                             keyboardType: TextInputType.phone,
                             style: const TextStyle(fontSize: 16),
+                            maxLength: 10,
+                            buildCounter:
+                                (
+                                  context, {
+                                  required currentLength,
+                                  required isFocused,
+                                  maxLength,
+                                }) => null,
                           )
                           : TextField(
+                            controller: _emailController,
                             decoration: InputDecoration(
                               hintText: 'Enter your Email ID',
                               border: OutlineInputBorder(
@@ -220,6 +355,19 @@ class _SignInPageState extends State<SignInPage> {
                             style: const TextStyle(fontSize: 16),
                           ),
 
+                      // Error message
+                      if (_errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+
                       const SizedBox(height: 25),
 
                       // Submit button
@@ -233,17 +381,36 @@ class _SignInPageState extends State<SignInPage> {
                             elevation: 5,
                             shadowColor: Colors.black.withOpacity(0.5),
                           ),
-                          onPressed: () {},
-                          child: Text(
-                            showPhoneLogin
-                                ? 'Get OTP'
-                                : 'Get verification code',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () {
+                                    if (showPhoneLogin) {
+                                      _handlePhoneSignIn();
+                                    } else {
+                                      _handleEmailSignIn();
+                                    }
+                                  },
+                          child:
+                              _isLoading
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : Text(
+                                    showPhoneLogin
+                                        ? 'Get OTP'
+                                        : 'Get verification code',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                         ),
                       ),
 

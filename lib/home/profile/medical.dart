@@ -42,7 +42,6 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   @override
   void initState() {
     super.initState();
-    // Ensure context is available for Provider.of
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadExistingData();
     });
@@ -65,6 +64,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   }
 
   void _populateFieldsFromData(Map<String, dynamic> data) {
+    if (!mounted) return;
     setState(() {
       allergies = List<String>.from(data['allergies'] ?? []);
       medications = List<String>.from(data['medications'] ?? []);
@@ -78,16 +78,13 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // Priority 1: UserProvider
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       UserModel? providerUser = userProvider.user;
       Map<String, dynamic>? providerMedicalData;
 
       if (providerUser != null &&
           providerUser.supabaseUid != null &&
-          providerUser.name != null &&
-          providerUser.name!.isNotEmpty) {
-        // Basic check
+          (providerUser.name != null && providerUser.name!.isNotEmpty)) {
         providerMedicalData = providerUser.getMedicalData();
       }
 
@@ -95,7 +92,6 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
         print('MedicalInfoScreen: Loading data from UserProvider');
         _populateFieldsFromData(providerMedicalData);
       } else {
-        // Priority 2: Local Storage
         print(
           'MedicalInfoScreen: UserProvider data not found or incomplete, trying local storage.',
         );
@@ -131,6 +127,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Ensure any text in input fields is added to tags before saving
       _addTagFromController(allergiesController, allergies, allergiesFocus);
       _addTagFromController(
         medicationsController,
@@ -145,17 +142,23 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       _addTagFromController(injuriesController, injuries, injuriesFocus);
       _addTagFromController(surgeriesController, surgeries, surgeriesFocus);
 
+      // Save medical data locally first
       await _userService.saveMedicalDataLocally(
-        allergies: allergies.isNotEmpty ? allergies : null,
+        allergies:
+            allergies.isNotEmpty
+                ? allergies
+                : null, // Pass null if empty, or [] if backend prefers
         medications: medications.isNotEmpty ? medications : null,
         chronicDiseases: chronicDiseases.isNotEmpty ? chronicDiseases : null,
         injuries: injuries.isNotEmpty ? injuries : null,
         surgeries: surgeries.isNotEmpty ? surgeries : null,
       );
 
+      // Now, submit ALL forms data (Demographic, Lifestyle, Medical) to the server
       final UserModel? submittedUser = await _userService.submitAllFormsData();
 
       if (submittedUser != null && mounted) {
+        // Update the UserProvider with the complete user data from the server
         Provider.of<UserProvider>(
           context,
           listen: false,
@@ -167,14 +170,18 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        // Navigate to a relevant screen, e.g., home or profile overview
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else if (mounted) {
+        // Handle case where submission might have occurred but no user data returned,
+        // or if submitAllFormsData itself indicates a failure not caught as an exception.
         throw Exception(
           'Failed to submit all forms data or user data not returned.',
         );
       }
     } catch (e) {
       if (mounted) {
+        print('MedicalInfoScreen: Submission failed: ${e.toString()}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Submission failed: ${e.toString()}')),
         );
@@ -189,14 +196,16 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   Future<void> _skipAndSubmit() async {
     setState(() => _isLoading = true);
     try {
+      // Save medical data locally as empty lists to signify skip
       await _userService.saveMedicalDataLocally(
-        allergies: [], // Explicitly save as empty for skip
+        allergies: [],
         medications: [],
         chronicDiseases: [],
         injuries: [],
         surgeries: [],
       );
 
+      // Submit all forms data (Demographic, Lifestyle, and skipped Medical)
       final UserModel? submittedUser = await _userService.submitAllFormsData();
 
       if (submittedUser != null && mounted) {
@@ -204,7 +213,6 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
           context,
           listen: false,
         ).setUser(submittedUser);
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -221,6 +229,9 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       }
     } catch (e) {
       if (mounted) {
+        print(
+          'MedicalInfoScreen: Submission after skipping failed: ${e.toString()}',
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Submission after skipping failed: ${e.toString()}'),
@@ -236,7 +247,6 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // More robust loading check
     bool isStillInitializing =
         _isLoading &&
         allergies.isEmpty &&
@@ -244,7 +254,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
         chronicDiseases.isEmpty &&
         injuries.isEmpty &&
         surgeries.isEmpty &&
-        allergiesController.text.isEmpty;
+        allergiesController.text.isEmpty; // Check controller too
 
     return Scaffold(
       backgroundColor: const Color(0xFF008D83),
@@ -290,6 +300,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
+                              // Progress Indicator
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               child: Row(
                                 children: [
@@ -472,8 +483,11 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                 );
               }).toList(),
               ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 150),
+                constraints: const BoxConstraints(
+                  minWidth: 150,
+                ), // Ensure field is wide enough
                 child: IntrinsicWidth(
+                  // Let TextField take necessary width
                   child: TextField(
                     controller: controller,
                     focusNode: focusNode,
@@ -488,7 +502,9 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                       ),
                       isDense: true,
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                      ), // Adjust padding
                     ),
                     onSubmitted: (value) {
                       _addTagFromController(controller, tagList, focusNode);
@@ -515,10 +531,10 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
           tagList.add(controller.text.trim());
         }
         controller.clear();
-        focusNode.requestFocus();
+        focusNode.requestFocus(); // Keep focus on the input field
       });
     } else {
-      focusNode.requestFocus();
+      focusNode.requestFocus(); // If empty, just ensure focus remains
     }
   }
 
@@ -613,6 +629,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
             onTap: (index) {
               if (index != 2) {
                 setState(() => _selectedIndex = index);
+                // Add navigation logic here
               }
             },
           ),

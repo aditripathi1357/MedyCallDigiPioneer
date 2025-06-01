@@ -4,6 +4,7 @@ import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
 import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/models/user_model.dart';
 import 'package:medycall/providers/user_provider.dart';
+import 'package:medycall/services/user_service.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,8 +12,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 class OtpEmail extends StatefulWidget {
   final String email;
   final String name;
+  final bool
+  isSignUp; // New parameter to distinguish between sign up and sign in
 
-  const OtpEmail({super.key, required this.email, required this.name});
+  const OtpEmail({
+    super.key,
+    required this.email,
+    required this.name,
+    this.isSignUp = true, // Default to sign up for backward compatibility
+  });
 
   @override
   State<OtpEmail> createState() => _OtpEmailState();
@@ -38,30 +46,111 @@ class _OtpEmailState extends State<OtpEmail> {
     });
 
     try {
-      // Verify OTP
-      final response = await _supabase.auth.verifyOTP(
-        email: widget.email,
-        token: _otp,
-        type: OtpType.signup,
-      );
+      AuthResponse response;
 
-      if (response.session != null) {
-        // Store the authentication token
+      if (widget.isSignUp) {
+        // Sign up verification
+        response = await _supabase.auth.verifyOTP(
+          email: widget.email,
+          token: _otp,
+          type: OtpType.signup,
+        );
+      } else {
+        // Sign in verification
+        response = await _supabase.auth.verifyOTP(
+          email: widget.email,
+          token: _otp,
+          type:
+              OtpType
+                  .email, // Corrected: Was OtpType.signup, should be for email/magiclink/recovery etc.
+          // Supabase uses OtpType.email for generic email OTPs during sign-in.
+          // Or OtpType.magiclink if you were using magic links.
+          // For password recovery, it's OtpType.recovery.
+          // Since signin.dart uses signInWithOtp, OtpType.email is appropriate here.
+        );
+      }
+
+      if (response.session != null && response.user != null) {
+        // Store the Supabase authentication token
         await _storeAuthToken(response.session!.accessToken);
 
-        // Store user data in the provider with token
         final userProvider = Provider.of<UserProvider>(context, listen: false);
+        final userService = UserService(); // Instantiate UserService
 
-        // Create user model with additional data from Supabase
-        final user = UserModel(
-          name: widget.name,
-          email: widget.email,
-          // Add Supabase user ID if available
-          id: response.user?.id,
-        );
-
-        userProvider.setUser(user);
+        // Set auth token in provider (optional, as Supabase client handles it)
         userProvider.setAuthToken(response.session!.accessToken);
+
+        // Attempt to fetch the full user profile from your backend
+        UserModel? fullUserProfile;
+        try {
+          // UserService.getUserProfile() uses Supabase.instance.client.auth.currentUser,
+          // which should now be populated after a successful verifyOTP.
+          print(
+            "OtpEmail: Attempting to fetch user profile for ${response.user!.id}",
+          );
+          fullUserProfile = await userService.getUserProfile();
+          if (fullUserProfile != null) {
+            print(
+              "OtpEmail: Full user profile fetched successfully: ${fullUserProfile.name}",
+            );
+          } else {
+            print(
+              "OtpEmail: User profile not found on backend or error during fetch for existing user.",
+            );
+          }
+        } catch (e) {
+          print("OtpEmail: Error fetching full user profile after login: $e");
+          // Decide how to handle this error.
+          // For now, we'll proceed with basic info if fetch fails.
+        }
+
+        if (fullUserProfile != null) {
+          // Full profile fetched successfully from your backend
+          userProvider.setUser(fullUserProfile);
+        } else {
+          // Profile not found on backend (e.g., new user who hasn't submitted forms)
+          // or an error occurred during fetching.
+          // Create a basic UserModel with info from Supabase.
+          final userName =
+              widget.isSignUp
+                  ? widget
+                      .name // Use name provided during sign-up
+                  : (response
+                          .user!
+                          .userMetadata?['name'] ?? // Check user_metadata
+                      response.user!.email?.split(
+                        '@',
+                      )[0] ?? // Fallback to part of email
+                      'User'); // Default fallback
+
+          final basicUser = UserModel(
+            id: response.user!.id, // CRITICAL: Use the Supabase User ID
+            name: userName,
+            email: widget.email,
+            // Initialize other UserModel fields as nullable or with defaults
+            // as per your UserModel definition if they are not fetched.
+            // For example:
+            // phone: null,
+            // title: null,
+            // birthDate: null,
+            // gender: null,
+            // etc.
+          );
+          userProvider.setUser(basicUser);
+          print(
+            "OtpEmail: Set basic user. Name: ${basicUser.name}, Email: ${basicUser.email}, ID: ${basicUser.id}",
+          );
+
+          if (widget.isSignUp ||
+              (fullUserProfile == null && !widget.isSignUp)) {
+            // This condition means it's a new signup, or it's a sign-in but the profile
+            // couldn't be fetched (either doesn't exist yet or error).
+            // Your app should guide the user to the profile completion flow if necessary.
+            print(
+              "OtpEmail: New signup or existing user profile not found/fetch failed. User may need to complete profile.",
+            );
+          }
+        }
 
         // Navigate to home screen
         if (mounted) {
@@ -74,11 +163,34 @@ class _OtpEmailState extends State<OtpEmail> {
       } else {
         setState(() {
           _errorMessage = 'Invalid verification code. Please try again.';
+          if (response.session == null)
+            print("OtpEmail: Verification response session is null");
+          if (response.user == null)
+            print("OtpEmail: Verification response user is null");
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Verification failed: ${e.toString()}';
+        if (e is AuthException) {
+          // More specific Supabase error handling
+          print(
+            "OtpEmail: AuthException: ${e.message}, statusCode: ${e.statusCode}",
+          );
+          if (e.message.toLowerCase().contains('token has expired') ||
+              e.statusCode == 401 ||
+              e.statusCode == 403) {
+            _errorMessage =
+                'Verification code has expired or is invalid. Please request a new one.';
+          } else if (e.message.toLowerCase().contains('invalid token') ||
+              e.message.toLowerCase().contains('otp mismatch')) {
+            _errorMessage = 'Invalid verification code. Please try again.';
+          } else {
+            _errorMessage = 'Verification failed: ${e.message}';
+          }
+        } else {
+          print("OtpEmail: Non-AuthException: ${e.toString()}");
+          _errorMessage = 'An unexpected error occurred: ${e.toString()}';
+        }
       });
     } finally {
       setState(() {
@@ -90,6 +202,78 @@ class _OtpEmailState extends State<OtpEmail> {
   Future<void> _storeAuthToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
+    print("OtpEmail: Auth token stored in SharedPreferences.");
+  }
+
+  Future<void> _resendOTP() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // For both sign-up and sign-in, `signInWithOtp` can be used to resend the OTP
+      // if the user already exists or to initiate if they don't (though signUp is more explicit for creation).
+      // If `shouldCreateUser` is false in `signInWithOtp` (as in your SignInPage),
+      // it will only send OTP if user exists.
+      // If user was created via `signUp` (which sends an OTP), resending via `signInWithOtp`
+      // to the same email should be fine for a new OTP.
+      // Alternatively, for sign-up, you could call `_supabase.auth.resend(...)` if available
+      // or re-trigger the original signUp call if it handles resends.
+      // Supabase's `resend` method is usually preferred if available for the flow.
+      // Let's use signInWithOtp for consistency with your SignInPage for resending an email OTP.
+      // The `signUp` call also sends an OTP, so if the user didn't get the first one from signUp,
+      // `signInWithOtp` to the same email will generate a new OTP for verification.
+
+      // If it's a sign-up flow and the initial OTP was for account creation:
+      if (widget.isSignUp) {
+        // Option 1: Using resend if available and appropriate for signup OTPs
+        // await _supabase.auth.resend(type: OtpType.signup, email: widget.email);
+
+        // Option 2: Retriggering a similar mechanism that sent the first OTP.
+        // If signUp was used initially:
+        // await _supabase.auth.signUp(email: widget.email, password: 'some_temporary_or_random_password_if_required_by_sdk_for_this_call');
+        // For email-only OTP signup, Supabase often just needs the email.
+        // If the user object isn't fully created yet, signInWithOtp might be better.
+
+        // Let's stick to signInWithOtp as it's versatile for sending OTPs to an email.
+        await _supabase.auth.signInWithOtp(
+          email: widget.email,
+          shouldCreateUser:
+              false, // Important: don't create a new user if resending
+        );
+      } else {
+        // For sign in, resend sign in OTP
+        await _supabase.auth.signInWithOtp(
+          email: widget.email,
+          shouldCreateUser: false, // User should already exist for sign-in
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'A new verification code has been sent to your email.',
+            ),
+            backgroundColor: Color(0xFF086861),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        if (e is AuthException) {
+          _errorMessage = 'Failed to resend OTP: ${e.message}';
+        } else {
+          _errorMessage = 'Failed to resend OTP: ${e.toString()}';
+        }
+        print("OtpEmail: Error resending OTP: $e");
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -172,10 +356,12 @@ class _OtpEmailState extends State<OtpEmail> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Enter OTP',
-                            style: TextStyle(
-                              fontSize: 30,
+                          Text(
+                            widget.isSignUp
+                                ? 'Verify Account'
+                                : 'Enter Verification Code',
+                            style: const TextStyle(
+                              fontSize: 28, // Adjusted for consistency
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF086861),
                             ),
@@ -198,11 +384,18 @@ class _OtpEmailState extends State<OtpEmail> {
                             focusedBorderColor: const Color(0xFF086861),
                             showFieldAsBox: true,
                             borderWidth: 2.0,
-                            fieldWidth: 45,
+                            fieldWidth:
+                                45, // Adjusted for better fit on some screens
+                            textStyle: const TextStyle(
+                              fontSize: 18,
+                              color: Color(0xFF086861),
+                            ),
                             //runs when a code is typed in
                             onCodeChanged: (String code) {
                               setState(() {
-                                _errorMessage = null;
+                                _errorMessage =
+                                    null; // Clear error when user types
+                                _otp = code; // Keep track of OTP as it's typed
                               });
                             },
                             //runs when every textfield is filled
@@ -210,7 +403,7 @@ class _OtpEmailState extends State<OtpEmail> {
                               setState(() {
                                 _otp = verificationCode;
                               });
-                              _verifyOTP();
+                              _verifyOTP(); // Call verify OTP when all fields are filled
                             },
                           ),
                           if (_errorMessage != null)
@@ -219,9 +412,12 @@ class _OtpEmailState extends State<OtpEmail> {
                               child: Text(
                                 _errorMessage!,
                                 style: const TextStyle(
-                                  color: Colors.red,
+                                  color:
+                                      Colors
+                                          .redAccent, // Slightly different red
                                   fontSize: 14,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           const SizedBox(height: 40),
@@ -231,12 +427,16 @@ class _OtpEmailState extends State<OtpEmail> {
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _verifyOTP,
+                              onPressed:
+                                  _isLoading || _otp.length != 6
+                                      ? null
+                                      : _verifyOTP, // Disable if loading or OTP not full
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF086861),
                                 shape: const StadiumBorder(),
                                 elevation: 5,
                                 shadowColor: Colors.black.withOpacity(0.8),
+                                disabledBackgroundColor: Colors.grey[400],
                               ),
                               child:
                                   _isLoading
@@ -248,9 +448,11 @@ class _OtpEmailState extends State<OtpEmail> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                      : const Text(
-                                        'Verify',
-                                        style: TextStyle(
+                                      : Text(
+                                        widget.isSignUp
+                                            ? 'Verify & Sign Up'
+                                            : 'Verify & Sign In',
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
@@ -272,46 +474,7 @@ class _OtpEmailState extends State<OtpEmail> {
                                 ),
                               ),
                               GestureDetector(
-                                onTap:
-                                    _isLoading
-                                        ? null
-                                        : () async {
-                                          setState(() {
-                                            _isLoading = true;
-                                          });
-                                          try {
-                                            await _supabase.auth.signInWithOtp(
-                                              email: widget.email,
-                                            );
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'OTP resent successfully',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Failed to resend OTP: ${e.toString()}',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            setState(() {
-                                              _isLoading = false;
-                                            });
-                                          }
-                                        },
+                                onTap: _isLoading ? null : _resendOTP,
                                 child: Text(
                                   'Resend',
                                   style: TextStyle(
@@ -321,6 +484,7 @@ class _OtpEmailState extends State<OtpEmail> {
                                         _isLoading
                                             ? Colors.grey
                                             : const Color(0xFF086861),
+                                    decoration: TextDecoration.underline,
                                   ),
                                 ),
                               ),

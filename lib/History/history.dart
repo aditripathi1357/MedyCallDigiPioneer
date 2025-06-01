@@ -7,6 +7,9 @@ import 'package:medycall/home/profile/profile.dart';
 import 'package:medycall/home/home_screen.dart';
 // import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:medycall/home/notification/notification.dart';
+import 'package:medycall/providers/user_provider.dart';
+import 'package:provider/provider.dart';
 
 class MedicalHistoryPage extends StatefulWidget {
   const MedicalHistoryPage({Key? key}) : super(key: key);
@@ -39,6 +42,9 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final userName =
+        userProvider.user?.name ?? 'Guest'; // Default to 'Guest' if no user
     return Scaffold(
       drawer: const Drawer(),
       body: SafeArea(
@@ -47,7 +53,7 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopBar(),
+              _buildTopBar(userName),
               const SizedBox(height: 20),
               Expanded(
                 child:
@@ -63,72 +69,149 @@ class _MedicalHistoryPageState extends State<MedicalHistoryPage> {
     );
   }
 
-  Widget _buildTopBar() {
+  // Add this field to your _HomeScreenState class
+  int? _selectedTopBarIconIndex;
+
+  Widget _buildTopBar(String userName) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundImage: AssetImage('assets/person.png'),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello,',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Color(0xFF37847E),
-                  ),
+        // Left side - wrap in Expanded to prevent overflow
+        Expanded(
+          flex: 3, // Give more space to the left side
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 20,
+                backgroundImage: AssetImage(
+                  'assets/homescreen/home_profile.png',
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+              const SizedBox(width: 12),
+              // Wrap the Column in Expanded to handle text overflow
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Mohadeesh Shokri',
+                      'Hello,',
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xFF37847E),
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    GestureDetector(
-                      onTap: () {
-                        // Handle image tap
-                      },
-                      child: Image.asset(
-                        'assets/homescreen/pencil.png',
-                        width: 30,
-                        height: 30,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Wrap username in Flexible to handle long names
+                        Flexible(
+                          child: Text(
+                            userName, // Use the passed userName here
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow:
+                                TextOverflow
+                                    .ellipsis, // Add ellipsis for long names
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        _buildIcon(
+                          assetPath: 'assets/homescreen/pencil.png',
+                          index: 0,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            const SizedBox(width: 3),
-            GestureDetector(
-              onTap: () {
-                // Handle image tap
-              },
-              child: Image.asset(
-                'assets/homescreen/notification.png',
-                width: 30,
-                height: 30,
               ),
+            ],
+          ),
+        ),
+        // Right side icons
+        Row(
+          mainAxisSize: MainAxisSize.min, // Important: minimize the size
+          children: [
+            _buildIcon(
+              assetPath: 'assets/homescreen/notification.png',
+              index: 1,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TabNavigatorScreen(),
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 3),
-            const SizedBox(width: 3),
+            const SizedBox(width: 8),
+            Builder(
+              builder:
+                  (context) => _buildIcon(
+                    assetPath: 'assets/homescreen/menu.png',
+                    index: 2,
+                    onTap: () {
+                      Scaffold.of(context).openDrawer();
+                    },
+                  ),
+            ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildIcon({
+    required String assetPath,
+    required int index,
+    required VoidCallback onTap,
+  }) {
+    final bool isSelected = _selectedTopBarIconIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          // Set this icon as selected, but only temporarily
+          _selectedTopBarIconIndex = index;
+        });
+
+        // Clear selection after a short delay (visual feedback)
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _selectedTopBarIconIndex = null;
+            });
+          }
+        });
+
+        // Execute the original onTap action
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? const Color(0xFF37847E).withOpacity(0.1)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Image.asset(
+          assetPath,
+          width: 30,
+          height: 30,
+          color: isSelected ? const Color(0xFF37847E) : null,
+        ),
+      ),
     );
   }
 

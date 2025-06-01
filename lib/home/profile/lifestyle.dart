@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:medycall/home/profile/medical.dart';
+import 'package:medycall/home/profile/medical.dart'; // Ensure this is the correct path to your MedicalInfoScreen
 import 'package:medycall/services/user_service.dart';
-import 'package:provider/provider.dart'; // Added for UserProvider
-import 'package:medycall/providers/user_provider.dart'; // Added for UserProvider
-import 'package:medycall/models/user_model.dart'; // Added for UserModel type hint
+import 'package:provider/provider.dart';
+import 'package:medycall/providers/user_provider.dart';
+import 'package:medycall/models/user_model.dart';
 
 class LifestyleForm extends StatefulWidget {
   const LifestyleForm({super.key});
@@ -28,13 +28,13 @@ class _LifestyleFormState extends State<LifestyleForm> {
   @override
   void initState() {
     super.initState();
-    // Ensure context is available for Provider.of
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadExistingData();
     });
   }
 
   void _populateFieldsFromData(Map<String, dynamic> data) {
+    if (!mounted) return;
     setState(() {
       smokingValue = data['smokingHabit'];
       alcoholValue = data['alcoholConsumption'];
@@ -48,16 +48,13 @@ class _LifestyleFormState extends State<LifestyleForm> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // Priority 1: UserProvider
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       UserModel? providerUser = userProvider.user;
       Map<String, dynamic>? providerLifestyleData;
 
       if (providerUser != null &&
           providerUser.supabaseUid != null &&
-          providerUser.name != null &&
-          providerUser.name!.isNotEmpty) {
-        // Basic check if profile data exists
+          (providerUser.name != null && providerUser.name!.isNotEmpty)) {
         providerLifestyleData = providerUser.getLifestyleData();
       }
 
@@ -65,7 +62,6 @@ class _LifestyleFormState extends State<LifestyleForm> {
         print('LifestyleForm: Loading data from UserProvider');
         _populateFieldsFromData(providerLifestyleData);
       } else {
-        // Priority 2: Local Storage
         print(
           'LifestyleForm: UserProvider data not found or incomplete, trying local storage.',
         );
@@ -141,23 +137,24 @@ class _LifestyleFormState extends State<LifestyleForm> {
   }
 
   Future<void> _skipToMedical() async {
-    // Save potentially empty/null data to signify this step was "visited"
     setState(() => _isLoading = true);
     try {
+      // Save current (possibly null/empty) selections to indicate the step was visited
       await _userService.saveLifestyleDataLocally(
-        smokingHabit: smokingValue, // Save current (possibly null) selections
+        smokingHabit: smokingValue,
         alcoholConsumption: alcoholValue,
         activityLevel: activityValue,
         dietHabit: dietValue,
         occupation: occupationValue,
       );
       if (mounted) {
-        print("Lifestyle data (possibly empty from skip) saved locally.");
+        print(
+          "LifestyleForm: Lifestyle data (possibly empty from skip) saved locally.",
+        );
       }
     } catch (e) {
       if (mounted) {
-        print("Error saving lifestyle data on skip: $e");
-        // Optionally show a non-blocking error or just log
+        print("LifestyleForm: Error saving lifestyle data on skip: $e");
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -352,10 +349,8 @@ class _LifestyleFormState extends State<LifestyleForm> {
                             ),
                             const SizedBox(height: 20),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 Expanded(
-                                  // Added Expanded
                                   child: ElevatedButton(
                                     onPressed:
                                         _isLoading ? null : _skipToMedical,
@@ -368,10 +363,7 @@ class _LifestyleFormState extends State<LifestyleForm> {
                                           color: Color(0xFF008D83),
                                         ),
                                       ),
-                                      minimumSize: const Size(
-                                        0,
-                                        50,
-                                      ), // Adjusted
+                                      minimumSize: const Size(0, 50),
                                     ),
                                     child: Text(
                                       'Skip for Now',
@@ -381,11 +373,8 @@ class _LifestyleFormState extends State<LifestyleForm> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(
-                                  width: 16,
-                                ), // Added SizedBox for spacing
+                                const SizedBox(width: 16),
                                 Expanded(
-                                  // Added Expanded
                                   child: ElevatedButton(
                                     onPressed:
                                         _isLoading
@@ -397,10 +386,7 @@ class _LifestyleFormState extends State<LifestyleForm> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(20),
                                       ),
-                                      minimumSize: const Size(
-                                        0,
-                                        50,
-                                      ), // Adjusted
+                                      minimumSize: const Size(0, 50),
                                     ),
                                     child:
                                         _isLoading
@@ -614,6 +600,7 @@ class _LifestyleFormState extends State<LifestyleForm> {
             onTap: (index) {
               if (index != 2) {
                 setState(() => _selectedIndex = index);
+                // Add navigation logic if needed
               }
             },
           ),

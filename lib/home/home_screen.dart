@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-//import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/articles.dart';
+import 'package:medycall/home/Payment/coupon.dart';
+import 'package:medycall/home/filter.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -12,30 +15,21 @@ import 'package:medycall/home/profile/profile.dart';
 //import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/History/history.dart';
 import 'package:medycall/home/Speciality/SpecialtyDoctors.dart';
-import 'package:medycall/home/notification/messages.dart';
+import 'package:medycall/home/notification/notification.dart';
 
-// Custom painter for polygon background
-class PolygonPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = const Color(0xFF018C7E)
-          ..style = PaintingStyle.fill;
-
-    final path =
-        Path()
-          ..moveTo(size.width * 0.2, 0)
-          ..lineTo(size.width, 0)
-          ..lineTo(size.width, size.height)
-          ..lineTo(0, size.height)
-          ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+class Doctor {
+  final String name;
+  final String specialization;
+  final String experience;
+  final String languages;
+  final String imagePath;
+  Doctor({
+    required this.name,
+    required this.specialization,
+    required this.experience,
+    required this.languages,
+    required this.imagePath,
+  });
 }
 
 class HomeScreen extends StatefulWidget {
@@ -47,6 +41,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  FilterData filterData = FilterData();
+
+  // Add this method
+  void _onFilterApplied(FilterData newFilterData) {
+    setState(() {
+      filterData = newFilterData;
+    });
+    // Your filter logic here
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,13 +77,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 24),
                 _buildPreviousAppointments(),
                 const SizedBox(height: 24),
-                _buildFavoriteDoctors(),
+                _buildFavoriteDoctors(context),
                 const SizedBox(height: 24),
                 _buildCanceledAppointments(),
                 const SizedBox(height: 24),
                 _buildMonthlyScheduler(),
                 const SizedBox(height: 24),
-                _buildHealthTracker(),
+                _buildHealthTrackerSection(),
+                const SizedBox(height: 24),
+                _buildArticlesSection(),
                 const SizedBox(height: 24),
                 _buildCouponsAndOffers(),
               ],
@@ -96,55 +101,74 @@ class _HomeScreenState extends State<HomeScreen> {
   // Add this field to your _HomeScreenState class
   int? _selectedTopBarIconIndex;
 
-  // Define the theme color constant
-  final Color themeColor = const Color(0xFF008D83);
-
   Widget _buildTopBar(String userName) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundImage: AssetImage('assets/person.png'),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello,',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Color(0xFF37847E),
-                  ),
+        // Left side - wrap in Expanded to prevent overflow
+        Expanded(
+          flex: 3, // Give more space to the left side
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 20,
+                backgroundImage: AssetImage(
+                  'assets/homescreen/home_profile.png',
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+              const SizedBox(width: 12),
+              // Wrap the Column in Expanded to handle text overflow
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      userName, // Use the passed userName here
+                      'Hello,',
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xFF37847E),
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    _buildIcon(
-                      assetPath: 'assets/homescreen/pencil.png',
-                      index: 0,
-                      onTap: () {
-                        // Handle image tap
-                      },
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Wrap username in Flexible to handle long names
+                        Flexible(
+                          child: Text(
+                            userName, // Use the passed userName here
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow:
+                                TextOverflow
+                                    .ellipsis, // Add ellipsis for long names
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        _buildIcon(
+                          assetPath: 'assets/homescreen/pencil.png',
+                          index: 0,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
+        // Right side icons
         Row(
+          mainAxisSize: MainAxisSize.min, // Important: minimize the size
           children: [
             _buildIcon(
               assetPath: 'assets/homescreen/notification.png',
@@ -153,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const MessagesScreen(),
+                    builder: (context) => const TabNavigatorScreen(),
                   ),
                 );
               },
@@ -175,7 +199,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Add this helper method to your _HomeScreenState class
   Widget _buildIcon({
     required String assetPath,
     required int index,
@@ -252,7 +275,18 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 4),
         IconButton(
           onPressed: () {
-            // Handle filter button tap
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder:
+                  (context) => FilterSheet(
+                    initialFilterData: filterData,
+                    onApplyFilters: _onFilterApplied,
+                  ),
+            );
           },
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(
@@ -307,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: CustomPaint(
                 size: const Size(200, 175),
-                painter: PolygonPainter(),
+                // painter: PolygonPainter(),
               ),
             ),
           ),
@@ -406,8 +440,12 @@ class _HomeScreenState extends State<HomeScreen> {
             // OPD Card
             InkWell(
               onTap: () {
-                // Handle OPD tap
-                print('OPD tapped');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MoreSpecialties(),
+                  ),
+                );
               },
               borderRadius: BorderRadius.circular(10),
               child: Container(
@@ -452,8 +490,12 @@ class _HomeScreenState extends State<HomeScreen> {
             // Tele-consultation Card
             InkWell(
               onTap: () {
-                // Handle Tele-consultation tap
-                print('Tele-consultation tapped');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MoreSpecialties(),
+                  ),
+                );
               },
               borderRadius: BorderRadius.circular(10),
               child: Container(
@@ -891,125 +933,232 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFavoriteDoctors() {
+  // Inside your existing Widget class (e.g., _MyExistingPageState or MyExistingPage)
+
+  // --- Add this _buildDoctorCard method ---
+  Widget _buildDoctorCard(
+    BuildContext context,
+    Doctor doctor,
+    bool isFrontCard,
+  ) {
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.85, // Adjust width as needed
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color:
+            isFrontCard
+                ? const Color(0xFF086861)
+                : const Color(0xFF075A54), // Slightly darker for back card
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundImage: AssetImage(doctor.imagePath),
+            onBackgroundImageError: (exception, stackTrace) {
+              // Consider adding a placeholder or logging for missing assets
+              print('Error loading image: ${doctor.imagePath}');
+            },
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  doctor.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  doctor.specialization,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${doctor.experience} Experience',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  doctor.languages,
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
+                ),
+                if (isFrontCard) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Handle Book Now for this doctor
+                            print('Book Now: ${doctor.name}');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: Text(
+                            'Book Now',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF018C7E),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            // Handle Know More for this doctor
+                            print('Know More: ${doctor.name}');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: Text(
+                            'Know More',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  // Inside your existing Widget class (e.g., _MyExistingPageState or MyExistingPage)
+
+  // --- Add this _buildFavoriteDoctors method ---
+  // You'll need to manage this list of doctors.
+  // It could be a state variable, passed in, or fetched from an API.
+  final List<Doctor> _favoriteDoctors = [
+    // Example Data
+    Doctor(
+      name: 'Dr. Anya Sharma',
+      specialization: 'BDS, MDS (Orthodontics)',
+      experience: '10 Years',
+      languages: 'English, Hindi',
+      imagePath:
+          'assets/doctor_anya.png', // Replace with your actual asset path
+    ),
+    Doctor(
+      name: 'Dr. Bansi Patel',
+      specialization: 'MBBS, MD (Medicine)',
+      experience: '8 Years',
+      languages: 'Hindi, English',
+      imagePath:
+          'assets/ladiesdoctor.png', // Replace with your actual asset path
+    ),
+    // Add more doctors here if needed
+  ];
+
+  Widget _buildFavoriteDoctors(BuildContext context) {
+    // Renamed from your original to avoid conflict if it was a top-level function
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Favorite Doctors',
-          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+          ), // Add padding for the title if desired
+          child: Text(
+            'Favorite Doctors',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Color(0xFF086861),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        if (_favoriteDoctors.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'No favorite doctors yet.',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
+            ),
+          )
+        else
+          SizedBox(
+            height:
+                220, // Adjust this based on your card content and desired overlap
+            child: Stack(
+              alignment: Alignment.center,
+              children: List.generate(_favoriteDoctors.length, (index) {
+                final doctor = _favoriteDoctors[index];
+                // The last doctor in the list is considered the "front" card
+                final isFrontCard = index == _favoriteDoctors.length - 1;
+
+                // Calculate offset for stacking. Cards are "pulled" from the right.
+                // The front card (last in list) has no offset.
+                // The card behind it is offset by 20, the one behind that by 40, etc.
+                double rightOffset =
+                    (_favoriteDoctors.length - 1 - index) *
+                    20.0; // Pushes cards to the left
+                double topOffset =
+                    (_favoriteDoctors.length - 1 - index) *
+                    15.0; // Pushes cards upwards
+
+                return Positioned(
+                  // Adjust top and horizontal positioning for the desired stack effect
+                  top: topOffset,
+                  // Center the stack horizontally, then apply individual offsets
+                  // This ensures the front card is centered, and others stack relative to it
+                  left: rightOffset, // Pushes cards from the left
+                  right:
+                      0, // Keep front card aligned to the right within its conceptual space
+                  // For a centered stack appearance relative to the SizedBox:
+                  // left: (MediaQuery.of(context).size.width - (MediaQuery.of(context).size.width * 0.85) - rightOffset) / 2 + rightOffset,
+                  child: _buildDoctorCard(context, doctor, isFrontCard),
+                );
+              }), // No .reversed needed due to how Positioned works with Stack children order
+            ),
           ),
-          child: Row(
-            children: [
-              const CircleAvatar(
-                radius: 30,
-                backgroundImage: AssetImage('assets/ladiesdoctor.png'),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Dr. Bansi Patel',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'MBBS, MD (Medicine)',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('8 Years', style: GoogleFonts.poppins(fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Hindi, English',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Handle Book Now
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                            child: Text(
-                              'Book Now',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF018C7E),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              // Handle Know More
-                            },
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                            child: Text(
-                              'Know More',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
+  // --- End of _buildFavoriteDoctors method ---
 
+  // --- End of _buildDoctorCard method ---
   Widget _buildCanceledAppointments() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1059,169 +1208,493 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMonthlyScheduler() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, color: Color(0xFF00796B)),
-              const SizedBox(width: 8),
-              Text(
-                'Monthly Scheduler',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Your Next Appointment Is On',
-            style: GoogleFonts.poppins(color: Colors.grey),
-          ),
-          Text(
-            '1 Jan 2025, 9 AM, Wednesday',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHealthTracker() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Your go-to Health Tracker...',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildProgressSection(
-            title: 'Steps',
-            current: 7684,
-            target: 10000,
-            unit: 'steps',
-          ),
-          const SizedBox(height: 16),
-          _buildProgressSection(
-            title: 'Calories',
-            current: 1300,
-            target: 10000,
-            unit: 'cal',
-          ),
-          const SizedBox(height: 24),
-          _buildWaterIntake(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressSection({
-    required String title,
-    required int current,
-    required int target,
-    required String unit,
-  }) {
-    final progress = current / target;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '$current $unit',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-            Text(
-              '$target $unit',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        LinearPercentIndicator(
-          percent: progress,
-          backgroundColor: Colors.grey.withOpacity(0.2),
-          progressColor: const Color(0xFF00796B),
-          lineHeight: 8,
-          barRadius: const Radius.circular(4),
-          padding: EdgeInsets.zero,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildWaterIntake() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Water Intake',
-          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+          'Monthly Scheduler',
+          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(
-            10,
-            (index) => Container(
-              width: 24,
-              height: 32,
-              decoration: BoxDecoration(
-                color:
-                    index < 4
-                        ? const Color(0xFF00796B)
-                        : Colors.grey.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(4),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-              child: const Icon(
-                Icons.water_drop,
-                color: Colors.white,
-                size: 16,
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your Next Appointment Is On',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                          Text(
+                            '1 Jan 2025, 9 AM, Wednesday',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        // TODO: Navigate to monthly schedule
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00796B),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: const Text(
+                        'See Your Monthly Schedule',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Image.asset(
+                'assets/homescreen/monthly_schedular.png',
+                height: 100,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHealthTrackerSection() {
+    final Color tealColor = const Color(0xFF00796B);
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 30, 20, 18),
+            color: tealColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Your Go-To Health Trecker",
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Enjoy The Best Ever Health Trackers All In One Place At Medycall Only!",
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Water Buddy
+          Row(
+            children: [
+              const SizedBox(width: 18),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tealColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "Forget To Drink Enough Water?",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: tealColor.withOpacity(0.2)),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Image.asset(
+                      "assets/homescreen/bottle.png",
+                      height: 30,
+                      width: 26,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      "Water\nBuddy",
+                      style: GoogleFonts.poppins(
+                        color: tealColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          // Yoga Teacher row
+          Row(
+            children: [
+              const SizedBox(width: 18),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: tealColor.withOpacity(0.2)),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Image.asset(
+                      "assets/homescreen/Yoga.png",
+                      height: 30,
+                      width: 29,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Yoga\nTeacher",
+                      style: GoogleFonts.poppins(
+                        color: tealColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.left,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tealColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "Want To Do Yoga Correctly?",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 18),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          // Diet Guru row
+          Row(
+            children: [
+              const SizedBox(width: 18),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tealColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "Worried About Diet?",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: tealColor.withOpacity(0.2)),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Image.asset(
+                      "assets/homescreen/diet.png",
+                      height: 30,
+                      width: 29,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Diet\nGuru",
+                      style: GoogleFonts.poppins(
+                        color: tealColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+            ],
+          ),
+
+          const SizedBox(height: 28),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArticlesSection() {
+    final List<Map<String, String>> articles = [
+      {
+        "title": "Latest In Your Area",
+        "date": "23 Jun 2023",
+        "project": "103",
+        "img":
+            "https://placehold.co/120x80/png", // Replace with Image.asset if local assets
+        "desc":
+            "A Hidden Threat? Covid Mutant Tracker, Anti-Cancer Trial Causes The Therm Usisr Shock Surprises. The D106P9Y Antibody Is Suggested In Your Mask.",
+      },
+      {
+        "title": "Latest In Your Area",
+        "date": "23 Jun 2023",
+        "project": "103",
+        "img":
+            "https://placehold.co/120x80/png", // Replace with Image.asset if local assets
+        "desc":
+            "A Hidden Threat? Covid Mutant Tracker, Anti-Cancer Trial Causes The Therm Usisr Shock Surprises. The D106P9Y Antibody Is Suggested In Your Mask.",
+      },
+    ];
+
+    return Container(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 15, 0, 7),
+            child: Text(
+              "Articals", // Keep original for screenshot match
+              style: GoogleFonts.roboto(
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                color: Colors.black,
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text('4 Glass Today', style: GoogleFonts.poppins(color: Colors.grey)),
-      ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children:
+                  articles.map((article) {
+                    return InkWell(
+                      onTap: () {
+                        // TODO: Navigate to next page
+                        print('Article tapped. Navigate to full article.');
+                      },
+                      child: Container(
+                        width: 250, // Fixed width for the article container
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 0,
+                        ),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        // Removed decoration (border and background styling)
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                10,
+                              ), // Keep image rounded
+                              child: Image.network(
+                                article["img"]!,
+                                width: double.infinity,
+                                height: 85,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 10, 0),
+                              child: Text(
+                                article["title"]!,
+                                style: GoogleFonts.roboto(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF00796B),
+                                  fontSize: 15.5,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 2, 10, 0),
+                              child: Text(
+                                "Posted On: ${article["date"]}    Projects: ${article["project"]}",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.grey[700],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 7, 10, 0),
+                              child: Text(
+                                article["desc"]!,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.2,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12.0,
+                              ),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: const Color(0xFF00796B),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () {
+                                    // TODO: Implement navigation to the full article
+                                  },
+                                  child: Text(
+                                    "Read Full Article",
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+            ),
+          ),
+          // Add the "See More" button here
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10.0),
+            child: Center(
+              child: SizedBox(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF00796B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 20,
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ArticlesScreen(),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    'See More Articles',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1229,25 +1702,80 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Coupons & Offers',
+              style: GoogleFonts.roboto(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CouponPage()),
+                );
+              },
+              child: Text(
+                'See All',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: const Color(0xFF00796B),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Text(
-          'Coupons & Offers',
-          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+          'Your Exclusive Discounts Await!',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w400,
+          ),
         ),
         const SizedBox(height: 16),
+        // First row of coupons
         Row(
           children: [
             Expanded(
               child: _buildCouponCard(
-                code: 'HEALTH10',
-                description: '10% off on all services',
+                code: 'Flat50',
+                description: 'Get 25% off on your first consultation',
                 color: const Color(0xFF00796B),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildCouponCard(
+                code: 'HEALTH10',
+                description: 'Avail 10% off on all OPD bookings',
+                color: const Color(0xFF00796B),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Second row of coupons
+        Row(
+          children: [
             Expanded(
               child: _buildCouponCard(
                 code: 'FAMILYCARE',
                 description: '₹100 off on family health checkups',
+                color: const Color(0xFF00796B),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildCouponCard(
+                code: 'WELLNESS20',
+                description: '20% off on selected lab tests',
                 color: const Color(0xFF00796B),
               ),
             ),
@@ -1263,33 +1791,44 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        image: const DecorationImage(
+          image: AssetImage('assets/appointmentcard.png'),
+          fit: BoxFit.cover,
+        ),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: color,
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               code,
               style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             description,
-            style: GoogleFonts.poppins(fontSize: 12, color: color),
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              color: Colors.white,
+              fontWeight: FontWeight.w400,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -1359,16 +1898,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'History',
               ),
               BottomNavigationBarItem(
-                icon: Image.asset(
-                  'assets/homescreen/profile.png',
-                  width: 24,
+                icon: Container(
+                  width: 35,
                   height: 24,
-                  color:
-                      _selectedIndex == 4
-                          ? const Color(0xFF00796B)
-                          : Colors.grey,
+                  alignment: Alignment.center,
+                  child: Image.asset(
+                    'assets/homescreen/medyscan.png',
+                    width: 35,
+                    height: 35,
+                    color:
+                        _selectedIndex == 4
+                            ? const Color(0xFF00796B)
+                            : Colors.grey,
+                  ),
                 ),
-                label: 'Profile',
+                label: 'Medyscan',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -1413,7 +1957,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 } else if (index == 4) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    MaterialPageRoute(builder: (context) => MedyscanPage()),
                   );
                 }
               }

@@ -31,11 +31,9 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  firebase_core: ^2.25.4
-  firebase_auth: ^4.17.4
+  firebase_core: ^3.4.1  # Compatible with firebase_auth 5.x
+  firebase_auth: ^5.5.4   # Updated to resolve dependency conflicts
   flutter_svg: ^2.0.7
   google_fonts: ^6.1.0
   percent_indicator: ^4.2.3
@@ -52,6 +50,7 @@ dependencies:
   permission_handler: ^11.0.0
   provider: ^6.0.5
   flutter_otp_text_field: ^1.5.1+1
+  file_picker: ^8.1.2
 
 dev_dependencies:
   flutter_test:
@@ -91,6 +90,7 @@ flutter:
     - assets/ladiesdoctor.png
     - assets/barcode.png
     - assets/success.png
+    - assets/waterdoctor.png
 
     # HomeScreen assets
     - assets/homescreen/pencil.png
@@ -105,6 +105,12 @@ flutter:
     - assets/homescreen/history.png
     - assets/homescreen/profile.png
     - assets/homescreen/nirog.png
+    - assets/homescreen/home_profile.png
+    - assets/homescreen/medyscan.png
+    - assets/homescreen/monthly_schedular.png
+    - assets/homescreen/bottle.png
+    - assets/homescreen/Yoga.png
+    - assets/homescreen/diet.png
     # Menu icons
     - assets/menu/menu_profile.svg
     - assets/menu/menu_reminder.svg
@@ -147,7 +153,10 @@ flutter:
     - assets/specialties/backarrow.svg
     - assets/specialties/hospitalprofile.png
     - assets/specialties/calendarsummary.png
-
+    #Medyscan
+    - assets/medyscan/camera.png
+    - assets/medyscan/human_body.png
+    - assets/medyscan/upload_files.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
