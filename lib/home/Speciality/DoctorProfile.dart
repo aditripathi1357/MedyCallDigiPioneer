@@ -1,16 +1,27 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/changelocation.dart';
 import 'package:medycall/Appointment/appointment.dart';
-import 'package:medycall/home/profile/profile.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:medycall/History/history.dart';
 import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/home/Speciality/bookslot.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
-  const DoctorProfileScreen({Key? key}) : super(key: key);
+  final String? doctorName;
+  final String? doctorSpecialty;
+  final String? consultationType;
+
+  const DoctorProfileScreen({
+    Key? key,
+    this.doctorName,
+    this.doctorSpecialty,
+    this.consultationType,
+  }) : super(key: key);
 
   @override
   State<DoctorProfileScreen> createState() => _DoctorProfileScreenState();
@@ -18,6 +29,61 @@ class DoctorProfileScreen extends StatefulWidget {
 
 class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   int _selectedIndex = 0;
+  Future<Map<String, String>> _loadLocationData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final locationString = prefs.getString('saved_location');
+
+      if (locationString != null) {
+        final savedLocation =
+            json.decode(locationString) as Map<String, dynamic>;
+        return savedLocation.map(
+          (key, value) => MapEntry(key, value.toString()),
+        );
+      }
+    } catch (e) {
+      print('Error loading location: $e');
+    }
+
+    // Return default values if no saved location
+    return {
+      'area': 'Unknown Area',
+      'city': 'Unknown City',
+      'houseNo': '',
+      'street': '',
+      'landmark': '',
+      'state': '',
+      'pincode': '',
+      'type': 'Home',
+    };
+  }
+
+  String _getAreaText(Map<String, String> location) {
+    // Create same display as LocationChangePage app bar
+    final parts =
+        [
+          location['houseNo'],
+          location['street'],
+          location['landmark'],
+          location['area'],
+        ].where((part) => part != null && part.isNotEmpty).toList();
+
+    if (parts.isNotEmpty) {
+      return parts.join(', ');
+    }
+
+    return location['area'] ?? 'Unknown Area';
+  }
+
+  String _getCityText(Map<String, String> location) {
+    return location['city'] ?? 'Unknown City';
+  }
+
+  // Default doctor data - will be used if no data is passed
+  String get displayDoctorName => widget.doctorName ?? 'Dr. Bansi Patel';
+  String get displaySpecialty => widget.doctorSpecialty ?? 'General Physician';
+  String get displayConsultationType =>
+      widget.consultationType ?? 'OPD, Tele consultation';
 
   @override
   Widget build(BuildContext context) {
@@ -56,82 +122,118 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   }
 
   Widget buildLocationWidget() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F8F8),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Image.asset(
-              'assets/location.png',
-              width: 30,
-              height: 30,
-              color: const Color(0xFF00796B),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Patel Colony',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Text(
-                    'Junagadh',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              height: 30,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[400]!),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LocationChangePage(),
-                    ),
-                  );
-                },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 0,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return FutureBuilder<Map<String, String>>(
+      future: _loadLocationData(), // This loads saved location
+      builder: (context, snapshot) {
+        // Get location data or use defaults
+        Map<String, String> location =
+            snapshot.data ??
+            {
+              'area': 'Unknown Area',
+              'city': 'Unknown City',
+              'houseNo': '',
+              'street': '',
+              'landmark': '',
+            };
+
+        // Create display text same as LocationChangePage
+        String displayArea = _getAreaText(location);
+        String displayCity = _getCityText(location);
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F8F8),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/location.png',
+                  width: 30,
+                  height: 30,
+                  color: const Color(0xFF00796B),
+                  errorBuilder:
+                      (context, error, stackTrace) => const Icon(
+                        Icons.location_on,
+                        size: 30,
+                        color: Color(0xFF00796B),
+                      ),
                 ),
-                child: Text(
-                  'Change Location',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayArea, // This will show combined address
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        displayCity, // This will show city
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                Container(
+                  height: 30,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[400]!),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: TextButton(
+                    onPressed: () async {
+                      // Navigate to LocationChangePage
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LocationChangePage(),
+                        ),
+                      );
+
+                      // Refresh the page when coming back
+                      if (result != null && mounted) {
+                        setState(() {}); // This refreshes the widget
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Change Location',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -144,18 +246,21 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12.0),
           child: Row(
             children: [
-              SvgPicture.asset(
-                'assets/specialties/backarrow.svg',
-                width: 20,
-                height: 20,
-                colorFilter: const ColorFilter.mode(
-                  Colors.teal,
-                  BlendMode.srcIn,
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: SvgPicture.asset(
+                  'assets/specialties/backarrow.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.teal,
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                'Dr. Bansi Patel',
+                displayDoctorName,
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -309,7 +414,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             buildInfoRow('Experience', '9 Years'),
             buildInfoRow('Licence No.', 'DJC-467582'),
             buildInfoRow('Language', 'English, Hindi'),
-            buildInfoRow('Consultation', 'OPD, Tele consultation'),
+            buildInfoRow('Consultation', displayConsultationType),
+            buildInfoRow('Specialty', displaySpecialty),
             const SizedBox(height: 10),
             Text(
               'Time slot',
@@ -439,7 +545,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Dr. Ani Mallik believes in patient-centric care, ensuring each individual receives personalized treatment plans tailored to their unique needs. By staying updated with the latest advancements in the field and employing evidence-based treatments for the best possible results.',
+              '${displayDoctorName} believes in patient-centric care, ensuring each individual receives personalized treatment plans tailored to their unique needs. By staying updated with the latest advancements in the field and employing evidence-based treatments for the best possible results.',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: Colors.black87,

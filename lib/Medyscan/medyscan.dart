@@ -224,7 +224,12 @@ class _MedyscanPageState extends State<MedyscanPage> {
     final userName = userProvider.user?.name ?? 'Guest';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFA),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        toolbarHeight: 0,
+        elevation: 0,
+        backgroundColor: Colors.white,
+      ),
       body: SafeArea(
         child: Container(
           decoration: const BoxDecoration(
@@ -238,7 +243,7 @@ class _MedyscanPageState extends State<MedyscanPage> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: _buildTopBar(userName),
               ),
               Expanded(
@@ -285,23 +290,26 @@ class _MedyscanPageState extends State<MedyscanPage> {
                         ),
                       ),
                       SizedBox(
-                        height: 350,
+                        height:
+                            380, // Increased height to accommodate better spacing
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
+                            // Background circle
                             Positioned(
-                              top: 15,
+                              top: 25,
                               child: Container(
-                                width: 270,
-                                height: 270,
+                                width: 260,
+                                height: 260,
                                 decoration: BoxDecoration(
                                   color: const Color(0x08686163),
                                   shape: BoxShape.circle,
                                 ),
                               ),
                             ),
+                            // Shadow
                             Positioned(
-                              bottom: 20,
+                              bottom: 30,
                               child: Container(
                                 width: 120,
                                 height: 15,
@@ -317,8 +325,9 @@ class _MedyscanPageState extends State<MedyscanPage> {
                                 ),
                               ),
                             ),
+                            // Human body image
                             Positioned(
-                              bottom: 30,
+                              bottom: 40,
                               child: _buildSafeImage(
                                 'assets/medyscan/human_body.png',
                                 height: 280,
@@ -645,16 +654,24 @@ class _MedyscanPageState extends State<MedyscanPage> {
     );
   }
 
+  // Updated tag button positioning to avoid overlapping with body parts
   List<Widget> _buildTagButtons() {
     return [
-      Positioned(top: 40, left: 17, child: _optionTagBox(_tags[0])),
-      Positioned(top: 40, right: 17, child: _optionTagBox(_tags[1])),
-      Positioned(top: 108, left: 7, child: _optionTagBox(_tags[2])),
-      Positioned(top: 108, right: 7, child: _optionTagBox(_tags[3])),
-      Positioned(top: 174, left: 28, child: _optionTagBox(_tags[4])),
-      Positioned(top: 174, right: 28, child: _optionTagBox(_tags[5])),
-      Positioned(top: 232, left: 47, child: _optionTagBox(_tags[6])),
-      Positioned(top: 232, right: 47, child: _optionTagBox(_tags[7])),
+      // Top row - positioned higher and further out
+      Positioned(top: 10, left: 30, child: _optionTagBox(_tags[0])),
+      Positioned(top: 10, right: 30, child: _optionTagBox(_tags[1])),
+
+      // Second row - positioned on the sides, away from chest area
+      Positioned(top: 70, left: 5, child: _optionTagBox(_tags[2])),
+      Positioned(top: 70, right: 5, child: _optionTagBox(_tags[3])),
+
+      // Third row - positioned lower on the sides, away from torso
+      Positioned(top: 140, left: 20, child: _optionTagBox(_tags[4])),
+      Positioned(top: 140, right: 20, child: _optionTagBox(_tags[5])),
+
+      // Bottom row - positioned much lower, away from leg area
+      Positioned(top: 210, left: 40, child: _optionTagBox(_tags[6])),
+      Positioned(top: 210, right: 40, child: _optionTagBox(_tags[7])),
     ];
   }
 
@@ -724,7 +741,9 @@ class _MedyscanPageState extends State<MedyscanPage> {
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
-                            overflow: TextOverflow.ellipsis,
+                            overflow:
+                                TextOverflow
+                                    .ellipsis, // Add ellipsis for long names
                           ),
                         ),
                         const SizedBox(width: 3),
@@ -750,7 +769,7 @@ class _MedyscanPageState extends State<MedyscanPage> {
         ),
         // Right side icons
         Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min, // Important: minimize the size
           children: [
             _buildIcon(
               assetPath: 'assets/homescreen/notification.png',
@@ -817,6 +836,7 @@ class _MedyscanPageState extends State<MedyscanPage> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -831,21 +851,26 @@ class _MedyscanPageState extends State<MedyscanPage> {
           child: BottomNavigationBar(
             items: [
               BottomNavigationBarItem(
-                icon: _buildSafeImage(
+                icon: Image.asset(
                   'assets/homescreen/home.png',
                   width: 24,
                   height: 24,
+                  color:
+                      _selectedIndex == 0
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: _buildSafeImage(
-                    'assets/homescreen/appointment.png',
-                    width: 24,
-                    height: 24,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
@@ -854,23 +879,26 @@ class _MedyscanPageState extends State<MedyscanPage> {
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
-                icon: _buildSafeImage(
+                icon: Image.asset(
                   'assets/homescreen/history.png',
                   width: 24,
                   height: 24,
+                  color:
+                      _selectedIndex == 3
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'History',
               ),
               BottomNavigationBarItem(
-                icon: Container(
-                  width: 35,
+                icon: Image.asset(
+                  'assets/homescreen/medyscan.png',
+                  width: 24,
                   height: 24,
-                  alignment: Alignment.center,
-                  child: _buildSafeImage(
-                    'assets/homescreen/medyscan.png',
-                    width: 35,
-                    height: 35,
-                  ),
+                  color:
+                      _selectedIndex == 4
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Medyscan',
               ),
@@ -881,18 +909,22 @@ class _MedyscanPageState extends State<MedyscanPage> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
                 setState(() {
                   _selectedIndex = index;
                 });
+
+                // Navigate based on index
                 if (index == 0) {
                   Navigator.push(
                     context,
@@ -922,13 +954,17 @@ class _MedyscanPageState extends State<MedyscanPage> {
             },
           ),
         ),
+        // Centered NIROG image
         Positioned(
           top: -20,
           child: Column(
             children: [
               GestureDetector(
-                onTap: () {},
-                child: _buildSafeImage(
+                onTap: () {
+                  print('NIROG tapped');
+                  // Add your NIROG button action here
+                },
+                child: Image.asset(
                   'assets/homescreen/nirog.png',
                   width: 51,
                   height: 54,

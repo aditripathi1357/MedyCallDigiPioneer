@@ -42,7 +42,6 @@ dependencies:
   supabase_flutter: ^2.8.4
   smooth_page_indicator: ^1.1.0
   image_picker: ^1.0.7  # Use this for all file selection needs
-  path_provider: ^2.1.1
   path: ^1.8.3
   google_maps_flutter: ^2.5.0
   geolocator: ^10.1.0
@@ -55,6 +54,12 @@ dependencies:
   camera: ^0.11.0+1    # Use latest version
   video_player: ^2.9.1 # Use latest version
   device_info_plus: ^9.1.0
+  screenshot: ^3.0.0  
+  share_plus: ^7.2.2
+  path_provider: ^2.1.2
+  url_launcher: ^6.2.2
+  
+  
  
 
 
@@ -131,8 +136,6 @@ flutter:
     - assets/menu/waterdoctor.png
     - assets/menu/emptyglass.png
     - assets/menu/filledglass.png
-    - assets/menu/filledglass.svg
-    - assets/menu/emptyglass.svg
     - assets/menu/yogateacher.png
     - assets/menu/dietdoctor.png
     

@@ -3,13 +3,16 @@ import 'package:medycall/models/address_model.dart'; // Make sure this path is c
 class UserModel {
   // Basic user info
   final String? id;
-  final String email;
+  final String? email; // Made optional
   final String? phone;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? supabaseUid;
+  final String? firebaseUid; // New field
+  final String? profileImageUrl; // New field for profile image
 
   // Demographic Data
+  // ... (rest of the fields remain the same)
   final String? title;
   final String? name;
   final DateTime? birthDate;
@@ -36,15 +39,17 @@ class UserModel {
   final List<String> surgeries;
 
   // Addresses
-  final List<AddressModel> addresses; // Added addresses field
+  final List<AddressModel> addresses;
 
   UserModel({
     this.id,
-    required this.email,
+    this.email, // No longer required
     this.phone,
     this.createdAt,
     this.updatedAt,
     this.supabaseUid,
+    this.firebaseUid, // Added to constructor
+    this.profileImageUrl, // Added to constructor
     // Demographic fields
     this.title,
     this.name,
@@ -56,25 +61,27 @@ class UserModel {
     this.maritalStatus,
     this.contactNumber,
     this.alternateNumber,
+
     // Lifestyle fields
     this.smokingHabit,
     this.alcoholConsumption,
     this.activityLevel,
     this.dietHabit,
     this.occupation,
+
     // Medical fields
     this.allergies = const [],
     this.medications = const [],
     this.chronicDiseases = const [],
     this.injuries = const [],
     this.surgeries = const [],
-    this.addresses = const [], // Initialize addresses
+    this.addresses = const [],
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'],
-      email: json['email'] ?? '',
+      email: json['email'],
       phone: json['phone'],
       createdAt:
           json['createdAt'] != null
@@ -85,6 +92,8 @@ class UserModel {
               ? DateTime.tryParse(json['updatedAt'])
               : null,
       supabaseUid: json['supabaseUid'],
+      firebaseUid: json['firebaseUid'],
+      profileImageUrl: json['profileImageUrl'], // Added for profile image
       // Demographic data
       title: json['title'],
       name: json['name'],
@@ -94,17 +103,19 @@ class UserModel {
               : null,
       gender: json['gender'],
       bloodGroup: json['bloodGroup'],
-      height: json['height'] as int?, // Added 'as int?' for type safety
-      weight: json['weight'] as int?, // Added 'as int?' for type safety
+      height: json['height'] as int?,
+      weight: json['weight'] as int?,
       maritalStatus: json['maritalStatus'],
       contactNumber: json['contactNumber'],
       alternateNumber: json['alternateNumber'],
+
       // Lifestyle data
       smokingHabit: json['smokingHabit'],
       alcoholConsumption: json['alcoholConsumption'],
       activityLevel: json['activityLevel'],
       dietHabit: json['dietHabit'],
       occupation: json['occupation'],
+
       // Medical data
       allergies:
           json['allergies'] != null ? List<String>.from(json['allergies']) : [],
@@ -120,7 +131,6 @@ class UserModel {
           json['injuries'] != null ? List<String>.from(json['injuries']) : [],
       surgeries:
           json['surgeries'] != null ? List<String>.from(json['surgeries']) : [],
-      // Parse addresses
       addresses:
           (json['addresses'] as List<dynamic>?)
               ?.map(
@@ -140,6 +150,8 @@ class UserModel {
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'supabaseUid': supabaseUid,
+      'firebaseUid': firebaseUid,
+      'profileImageUrl': profileImageUrl, // Added for profile image
       // Demographic data
       'title': title,
       'name': name,
@@ -151,19 +163,20 @@ class UserModel {
       'maritalStatus': maritalStatus,
       'contactNumber': contactNumber,
       'alternateNumber': alternateNumber,
+
       // Lifestyle data
       'smokingHabit': smokingHabit,
       'alcoholConsumption': alcoholConsumption,
       'activityLevel': activityLevel,
       'dietHabit': dietHabit,
       'occupation': occupation,
+
       // Medical data
       'allergies': allergies,
       'medications': medications,
       'chronicDiseases': chronicDiseases,
       'injuries': injuries,
       'surgeries': surgeries,
-      // Serialize addresses
       'addresses': addresses.map((address) => address.toJson()).toList(),
     };
   }
@@ -171,7 +184,6 @@ class UserModel {
   // Helper method to get only demographic data
   Map<String, dynamic> getDemographicData() {
     return {
-      // Including email and phone here as they are often part of demographic info forms
       'email': email,
       'phone': phone,
       'title': title,
@@ -209,18 +221,15 @@ class UserModel {
     };
   }
 
-  // Helper to get the default or first address for display
   AddressModel? get defaultOrFirstAddress {
     if (addresses.isEmpty) return null;
     try {
       return addresses.firstWhere((addr) => addr.isDefault);
     } catch (e) {
-      // No default address found, return the first one
       return addresses.first;
     }
   }
 
-  // Method to create a copy with updated fields
   UserModel copyWith({
     String? id,
     String? email,
@@ -228,6 +237,8 @@ class UserModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? supabaseUid,
+    String? firebaseUid,
+    String? profileImageUrl, // Added profileImageUrl
     String? title,
     String? name,
     DateTime? birthDate,
@@ -248,7 +259,7 @@ class UserModel {
     List<String>? chronicDiseases,
     List<String>? injuries,
     List<String>? surgeries,
-    List<AddressModel>? addresses, // Added addresses to copyWith
+    List<AddressModel>? addresses,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -257,6 +268,9 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       supabaseUid: supabaseUid ?? this.supabaseUid,
+      firebaseUid: firebaseUid ?? this.firebaseUid,
+      profileImageUrl:
+          profileImageUrl ?? this.profileImageUrl, // Added profileImageUrl
       title: title ?? this.title,
       name: name ?? this.name,
       birthDate: birthDate ?? this.birthDate,
@@ -277,7 +291,7 @@ class UserModel {
       chronicDiseases: chronicDiseases ?? this.chronicDiseases,
       injuries: injuries ?? this.injuries,
       surgeries: surgeries ?? this.surgeries,
-      addresses: addresses ?? this.addresses, // Assign addresses in copyWith
+      addresses: addresses ?? this.addresses,
     );
   }
 }

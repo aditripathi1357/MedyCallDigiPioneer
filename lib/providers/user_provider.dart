@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:medycall/models/user_model.dart'; // Ensure UserModel has getDemographicData(), getLifestyleData(), getMedicalData() methods
+import 'package:medycall/models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:medycall/services/user_service.dart'; // Assuming UserService is in services folder
 
 class UserProvider with ChangeNotifier {
   UserModel? _user;
@@ -9,30 +10,26 @@ class UserProvider with ChangeNotifier {
   Map<String, dynamic>? _medicalData;
   String? _authToken;
 
+  // Instance of UserService. Ideally, this would be injected.
+  final UserService _userService = UserService();
+
   // Getters
   UserModel? get user => _user;
-  // The direct getters for _demographicData, _lifestyleData, _medicalData
-  // are kept, as they are now synced with the _user object.
   Map<String, dynamic>? get demographicDataFromMap => _demographicData;
   Map<String, dynamic>? get lifestyleDataFromMap => _lifestyleData;
   Map<String, dynamic>? get medicalDataFromMap => _medicalData;
   String? get authToken => _authToken;
 
-  // Check if user is authenticated
   bool get isAuthenticated => _authToken != null && _user != null;
 
-  // User management
   void setUser(UserModel user) {
-    _user = user;
-    // Populate individual data maps from the primary UserModel
-    // Assumes UserModel has methods to extract these sections as Maps.
-    // If UserModel stores these as maps directly, access them.
-    // Otherwise, UserModel needs methods like user.getDemographicDataMap().
-    _demographicData =
-        user.getDemographicData(); // Example: user.getDemographicData()
-    _lifestyleData =
-        user.getLifestyleData(); // Example: user.getLifestyleData()
-    _medicalData = user.getMedicalData(); // Example: user.getMedicalData()
+    _user = user; // UserModel now includes profileImageUrl
+    _demographicData = user.getDemographicData();
+    _lifestyleData = user.getLifestyleData();
+    _medicalData = user.getMedicalData();
+    // If profileImageUrl was stored in SharedPreferences by _saveUserModelToLocal,
+    // you might want to update a local _profileImageUrl variable here too,
+    // but it's better to rely on _user.profileImageUrl.
     notifyListeners();
   }
 
@@ -41,11 +38,9 @@ class UserProvider with ChangeNotifier {
     _demographicData = null;
     _lifestyleData = null;
     _medicalData = null;
-    // Keep auth token unless a full sign-out is intended (see clearAllData)
     notifyListeners();
   }
 
-  // Token management
   void setAuthToken(String token) {
     _authToken = token;
     _saveTokenToPrefs(token);
@@ -63,7 +58,7 @@ class UserProvider with ChangeNotifier {
     final token = prefs.getString('auth_token');
     if (token != null) {
       _authToken = token;
-      notifyListeners(); // Notify so UI can react if needed (e.g., attempt to load user)
+      notifyListeners();
     }
   }
 
@@ -77,30 +72,24 @@ class UserProvider with ChangeNotifier {
     await prefs.remove('auth_token');
   }
 
-  // Data section management
   void setDemographicData(Map<String, dynamic> data) {
     _demographicData = data;
-    // Update the main user model from the combined stored data
     _user = createUserModelFromStoredData();
     notifyListeners();
   }
 
   void setLifestyleData(Map<String, dynamic> data) {
     _lifestyleData = data;
-    // Update the main user model from the combined stored data
     _user = createUserModelFromStoredData();
     notifyListeners();
   }
 
   void setMedicalData(Map<String, dynamic> data) {
     _medicalData = data;
-    // Update the main user model from the combined stored data
     _user = createUserModelFromStoredData();
     notifyListeners();
   }
 
-  // Data retrieval methods from the UserModel (preferred way if _user is populated)
-  // These methods provide data directly from the _user object if it exists.
   Map<String, dynamic>? getDemographicData() {
     return _user?.getDemographicData();
   }
@@ -113,32 +102,36 @@ class UserProvider with ChangeNotifier {
     return _user?.getMedicalData();
   }
 
-  // Profile completion methods
   Map<String, dynamic> getCompleteProfileDataFromMaps() {
     Map<String, dynamic> completeData = {};
     if (_demographicData != null) completeData.addAll(_demographicData!);
     if (_lifestyleData != null) completeData.addAll(_lifestyleData!);
     if (_medicalData != null) completeData.addAll(_medicalData!);
+    // profileImageUrl is not explicitly in these maps by default from UserService._saveUserModelToLocal
+    // It would be part of _user object directly.
     return completeData;
   }
 
   UserModel createUserModelFromStoredData() {
     final completeData = getCompleteProfileDataFromMaps();
-
-    // Ensure UserModel constructor and fromJson handle potentially missing fields gracefully.
-    // The field mapping here should accurately reflect your UserModel structure.
+    // profileImageUrl will be sourced from existing _user object's profileImageUrl
+    // or will be null if not set/fetched.
+    // If profileImageUrl was stored in one of the local data maps (e.g., demographicData),
+    // you would retrieve it from completeData['profileImageUrl'] here.
     return UserModel(
-      // Supabase UID might be set separately or be part of the UserModel constructor/fields
-      // supabaseUid: _user?.supabaseUid, // Or fetched from auth service if not in these maps
-      email:
-          completeData['email'] ??
-          _user?.email ??
-          '', // Prioritize map data, fallback to existing user email
-      phone:
-          completeData['phone'] ??
-          _user
-              ?.phone, // Assuming 'phone' is the correct key from demographic data for UserModel.phone
-      // Demographic fields from _demographicData
+      // Basic info might come from _user or be reconstructed if needed
+      id: _user?.id,
+      supabaseUid: _user?.supabaseUid,
+      firebaseUid: _user?.firebaseUid,
+      createdAt: _user?.createdAt,
+      updatedAt: _user?.updatedAt,
+      profileImageUrl:
+          completeData['profileImageUrl'] ??
+          _user?.profileImageUrl, // Get from map or existing _user
+
+      email: completeData['email'] ?? _user?.email,
+      phone: completeData['phone'] ?? _user?.phone,
+
       title: completeData['title'] ?? _user?.title,
       name: completeData['name'] ?? _user?.name,
       birthDate:
@@ -154,7 +147,6 @@ class UserProvider with ChangeNotifier {
       alternateNumber:
           completeData['alternateNumber'] ?? _user?.alternateNumber,
 
-      // Lifestyle fields from _lifestyleData
       smokingHabit: completeData['smokingHabit'] ?? _user?.smokingHabit,
       alcoholConsumption:
           completeData['alcoholConsumption'] ?? _user?.alcoholConsumption,
@@ -162,7 +154,6 @@ class UserProvider with ChangeNotifier {
       dietHabit: completeData['dietHabit'] ?? _user?.dietHabit,
       occupation: completeData['occupation'] ?? _user?.occupation,
 
-      // Medical fields from _medicalData
       allergies: List<String>.from(
         completeData['allergies'] ?? _user?.allergies ?? [],
       ),
@@ -178,10 +169,12 @@ class UserProvider with ChangeNotifier {
       surgeries: List<String>.from(
         completeData['surgeries'] ?? _user?.surgeries ?? [],
       ),
+      addresses:
+          _user?.addresses ??
+          [], // Assuming addresses are part of the main _user object
     );
   }
 
-  // Clear methods
   void clearStoredDataMaps() {
     _demographicData = null;
     _lifestyleData = null;
@@ -195,11 +188,10 @@ class UserProvider with ChangeNotifier {
     _lifestyleData = null;
     _medicalData = null;
     _authToken = null;
-    _removeTokenFromPrefs(); // ensure token is also cleared from persistence
+    _removeTokenFromPrefs();
     notifyListeners();
   }
 
-  // Status check methods
   bool hasAnyStoredDataMaps() {
     return _demographicData != null ||
         _lifestyleData != null ||
@@ -207,19 +199,50 @@ class UserProvider with ChangeNotifier {
   }
 
   bool isProfileCompleteViaMaps() {
-    // Checks if all three underlying maps are populated.
-    // The main _user object might be a more direct check if it's always kept whole.
     return _demographicData != null &&
         _lifestyleData != null &&
         _medicalData != null;
   }
 
-  // Session validation
   Future<bool> validateSession() async {
     if (_authToken == null) {
       return false;
     }
-    // Add additional validation logic here if needed (e.g., token expiry check)
     return true;
+  }
+
+  // Method to update user profile fields, including profileImageUrl
+  Future<bool> updateUserProfileFields(
+    Map<String, dynamic> dataToUpdate,
+  ) async {
+    if (_user == null) return false;
+    try {
+      UserModel? updatedUser = await _userService.updateUserFields(
+        dataToUpdate,
+      );
+      if (updatedUser != null) {
+        setUser(updatedUser); // This updates _user and notifies listeners
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("[UserProvider.updateUserProfileFields] Error: $e");
+      return false;
+    }
+  }
+
+  // Method to fetch user profile from server and update provider
+  Future<void> fetchUserProfile() async {
+    try {
+      UserModel? userModel = await _userService.getUserProfile();
+      if (userModel != null) {
+        setUser(userModel);
+      } else {
+        // Handle case where user profile couldn't be fetched, maybe clear user
+        // clearUser();
+      }
+    } catch (e) {
+      print("[UserProvider.fetchUserProfile] Error: $e");
+    }
   }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:medycall/auth/signupnumber.dart';
 import 'package:medycall/auth/otpemail.dart';
+import 'package:medycall/auth/otpnumber.dart'; // Add this import
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -17,6 +19,8 @@ class _SignInPageState extends State<SignInPage> {
   bool _isLoading = false;
   String? _errorMessage;
   final _supabase = Supabase.instance.client;
+  final FirebaseAuth _auth =
+      FirebaseAuth.instance; // Add Firebase Auth instance
 
   @override
   void dispose() {
@@ -25,57 +29,42 @@ class _SignInPageState extends State<SignInPage> {
     super.dispose();
   }
 
-  // In your SignInPage, update the _handleEmailSignIn method:
-
   Future<void> _handleEmailSignIn() async {
     final email = _emailController.text.trim();
-
     if (email.isEmpty) {
       setState(() {
         _errorMessage = 'Please enter your email address';
       });
       return;
     }
-
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       setState(() {
         _errorMessage = 'Please enter a valid email address';
       });
       return;
     }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
-      // Send OTP for sign in (not magic link)
       await _supabase.auth.signInWithOtp(
         email: email,
-        emailRedirectTo: null, // This prevents magic link generation
-        shouldCreateUser: false, // Don't create user if doesn't exist
+        emailRedirectTo: null,
+        shouldCreateUser: false,
       );
-
       if (mounted) {
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Verification code sent to your email'),
             backgroundColor: Color(0xFF086861),
           ),
         );
-
-        // Navigate to OTP verification page
         Navigator.push(
           context,
           MaterialPageRoute(
             builder:
-                (context) => OtpEmail(
-                  email: email,
-                  name: '', // Empty name for sign in
-                  isSignUp: false, // This is sign in, not sign up
-                ),
+                (context) => OtpEmail(email: email, name: '', isSignUp: false),
           ),
         );
       }
@@ -97,39 +86,78 @@ class _SignInPageState extends State<SignInPage> {
 
   Future<void> _handlePhoneSignIn() async {
     final phone = _phoneController.text.trim();
-
     if (phone.isEmpty) {
       setState(() {
         _errorMessage = 'Please enter your phone number';
       });
       return;
     }
-
     if (phone.length != 10) {
       setState(() {
         _errorMessage = 'Please enter a valid 10-digit phone number';
       });
       return;
     }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
-      // For phone sign in, you would implement your phone OTP logic here
-      // This is a placeholder - implement according to your phone auth provider
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Phone sign in not implemented yet')),
+      final String phoneNumber = '+91$phone';
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification completed
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              if (e.code == 'invalid-phone-number') {
+                _errorMessage = 'The provided phone number is not valid.';
+              } else if (e.code == 'too-many-requests') {
+                _errorMessage = 'Too many requests. Please try again later.';
+              } else {
+                _errorMessage = 'Verification failed: ${e.message}';
+              }
+            });
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('OTP sent to your phone number'),
+                backgroundColor: Color(0xFF086861),
+              ),
+            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => OtpNumber(
+                      phoneNumber: phoneNumber,
+                      verificationId: verificationId,
+                      userName: '', // Empty name for sign in
+                      isSignUp:
+                          false, // Key change: Indicate this is for sign-in
+                    ),
+              ),
+            );
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Auto-retrieval timeout
+        },
+        timeout: const Duration(seconds: 60),
       );
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to send OTP: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
         _isLoading = false;
+        _errorMessage = 'Failed to send OTP: ${e.toString()}';
       });
     }
   }
@@ -182,7 +210,6 @@ class _SignInPageState extends State<SignInPage> {
               ],
             ),
           ),
-
           // Main content
           Center(
             child: SizedBox(
@@ -208,9 +235,7 @@ class _SignInPageState extends State<SignInPage> {
                           color: Color(0xFF086861),
                         ),
                       ),
-
                       const SizedBox(height: 30),
-
                       // Toggle between phone and email
                       Container(
                         decoration: BoxDecoration(
@@ -278,9 +303,7 @@ class _SignInPageState extends State<SignInPage> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
                       // Conditional input field
                       showPhoneLogin
                           ? TextField(
@@ -354,7 +377,6 @@ class _SignInPageState extends State<SignInPage> {
                             keyboardType: TextInputType.emailAddress,
                             style: const TextStyle(fontSize: 16),
                           ),
-
                       // Error message
                       if (_errorMessage != null)
                         Padding(
@@ -367,9 +389,7 @@ class _SignInPageState extends State<SignInPage> {
                             ),
                           ),
                         ),
-
                       const SizedBox(height: 25),
-
                       // Submit button
                       SizedBox(
                         width: double.infinity,
@@ -413,9 +433,7 @@ class _SignInPageState extends State<SignInPage> {
                                   ),
                         ),
                       ),
-
                       const SizedBox(height: 25),
-
                       // Divider with "or" text
                       const Row(
                         children: [
@@ -430,9 +448,7 @@ class _SignInPageState extends State<SignInPage> {
                           Expanded(child: Divider(color: Color(0xFF086861))),
                         ],
                       ),
-
                       const SizedBox(height: 25),
-
                       // Social login options
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -443,9 +459,7 @@ class _SignInPageState extends State<SignInPage> {
                           _buildSocialButton('assets/twitter.png', () {}),
                         ],
                       ),
-
                       const SizedBox(height: 20),
-
                       // Sign up text
                       GestureDetector(
                         onTap: () {

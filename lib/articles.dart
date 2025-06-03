@@ -4,9 +4,10 @@ import 'package:medycall/Appointment/appointment.dart';
 import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/home/Speciality/changelocation.dart';
 import 'package:medycall/home/home_screen.dart';
-import 'package:medycall/home/profile/profile.dart';
 //import 'package:medycall/home/home_screen.dart';
 import 'package:medycall/History/history.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 // Data model for an article
 class Article {
@@ -32,6 +33,55 @@ class ArticlesScreen extends StatefulWidget {
 
 class _ArticlesScreenState extends State<ArticlesScreen> {
   int _selectedIndex = 0;
+  Future<Map<String, String>> _loadLocationData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final locationString = prefs.getString('saved_location');
+
+      if (locationString != null) {
+        final savedLocation =
+            json.decode(locationString) as Map<String, dynamic>;
+        return savedLocation.map(
+          (key, value) => MapEntry(key, value.toString()),
+        );
+      }
+    } catch (e) {
+      print('Error loading location: $e');
+    }
+
+    // Return default values if no saved location
+    return {
+      'area': 'Unknown Area',
+      'city': 'Unknown City',
+      'houseNo': '',
+      'street': '',
+      'landmark': '',
+      'state': '',
+      'pincode': '',
+      'type': 'Home',
+    };
+  }
+
+  String _getAreaText(Map<String, String> location) {
+    // Create same display as LocationChangePage app bar
+    final parts =
+        [
+          location['houseNo'],
+          location['street'],
+          location['landmark'],
+          location['area'],
+        ].where((part) => part != null && part.isNotEmpty).toList();
+
+    if (parts.isNotEmpty) {
+      return parts.join(', ');
+    }
+
+    return location['area'] ?? 'Unknown Area';
+  }
+
+  String _getCityText(Map<String, String> location) {
+    return location['city'] ?? 'Unknown City';
+  }
 
   // Dummy data for articles
   // Replace 'assets/covid_article_placeholder.png' with your actual asset paths
@@ -64,83 +114,118 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 
   // Your provided buildLocationWidget
   Widget buildLocationWidget() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F8F8), // Light mint/cyan background
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Image.asset(
-              'assets/location.png', // Ensure this asset exists
-              width: 30,
-              height: 30,
-              color: const Color(0xFF00796B), // Teal color
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Patel Colony',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Text(
-                    'Junagadh',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              height: 30,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[400]!),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LocationChangePage(),
-                    ),
-                  );
-                },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 0,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  foregroundColor: Colors.black, // Text color for TextButton
+    return FutureBuilder<Map<String, String>>(
+      future: _loadLocationData(), // This loads saved location
+      builder: (context, snapshot) {
+        // Get location data or use defaults
+        Map<String, String> location =
+            snapshot.data ??
+            {
+              'area': 'Unknown Area',
+              'city': 'Unknown City',
+              'houseNo': '',
+              'street': '',
+              'landmark': '',
+            };
+
+        // Create display text same as LocationChangePage
+        String displayArea = _getAreaText(location);
+        String displayCity = _getCityText(location);
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F8F8),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/location.png',
+                  width: 30,
+                  height: 30,
+                  color: const Color(0xFF00796B),
+                  errorBuilder:
+                      (context, error, stackTrace) => const Icon(
+                        Icons.location_on,
+                        size: 30,
+                        color: Color(0xFF00796B),
+                      ),
                 ),
-                child: Text(
-                  'Change Location',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayArea, // This will show combined address
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        displayCity, // This will show city
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                Container(
+                  height: 30,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[400]!),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: TextButton(
+                    onPressed: () async {
+                      // Navigate to LocationChangePage
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LocationChangePage(),
+                        ),
+                      );
+
+                      // Refresh the page when coming back
+                      if (result != null && mounted) {
+                        setState(() {}); // This refreshes the widget
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Change Location',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -280,6 +365,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       alignment: Alignment.topCenter,
       children: [
         Container(
+          height: 80, // Add explicit height
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -295,7 +381,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             items: [
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/home.png', // Ensure this asset exists
+                  'assets/homescreen/home.png',
                   width: 24,
                   height: 24,
                   color:
@@ -306,30 +392,24 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Image.asset(
-                    'assets/homescreen/appointment.png', // Ensure this asset exists
-                    width: 24,
-                    height: 24,
-                    color:
-                        _selectedIndex == 1
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                icon: Image.asset(
+                  'assets/homescreen/appointment.png',
+                  width: 24,
+                  height: 24,
+                  color:
+                      _selectedIndex == 1
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Appointment',
               ),
               BottomNavigationBarItem(
-                icon: const SizedBox(
-                  width: 24,
-                  height: 24,
-                ), // Placeholder for NIROG icon
+                icon: const SizedBox(width: 24, height: 24),
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/history.png', // Ensure this asset exists
+                  'assets/homescreen/history.png',
                   width: 24,
                   height: 24,
                   color:
@@ -340,19 +420,14 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 label: 'History',
               ),
               BottomNavigationBarItem(
-                icon: Container(
-                  width: 35,
+                icon: Image.asset(
+                  'assets/homescreen/medyscan.png',
+                  width: 24,
                   height: 24,
-                  alignment: Alignment.center,
-                  child: Image.asset(
-                    'assets/homescreen/medyscan.png', // Ensure this asset exists
-                    width: 35,
-                    height: 35,
-                    color:
-                        _selectedIndex == 4
-                            ? const Color(0xFF00796B)
-                            : Colors.grey,
-                  ),
+                  color:
+                      _selectedIndex == 4
+                          ? const Color(0xFF00796B)
+                          : Colors.grey,
                 ),
                 label: 'Medyscan',
               ),
@@ -363,49 +438,38 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 13.8,
+              fontSize: 10, // Smaller font size
               fontWeight: FontWeight.w400,
             ),
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index != 2) {
-                // Prevent selection of NIROG placeholder tab
                 setState(() {
                   _selectedIndex = index;
                 });
                 // Navigate based on index
                 if (index == 0) {
-                  // If current screen is not ArticlesScreen, navigate.
-                  // This prevents pushing ArticlesScreen on top of itself.
-                  if (ModalRoute.of(context)?.settings.name != '/articles') {
-                    // Assuming '/articles' is the route name for ArticlesScreen
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HomeScreen(),
-                        settings: const RouteSettings(
-                          name: '/articles',
-                        ), // Optional: set a route name
-                      ),
-                      (Route<dynamic> route) =>
-                          false, // Remove all previous routes
-                    );
-                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
                 } else if (index == 1) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AppointmentScreen(),
+                      builder: (context) => AppointmentScreen(),
                     ),
                   );
                 } else if (index == 3) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const MedicalHistoryPage(),
+                      builder: (context) => MedicalHistoryPage(),
                     ),
                   );
                 } else if (index == 4) {
@@ -418,24 +482,23 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             },
           ),
         ),
-        // Centered NIROG image/button
+        // Centered NIROG image
         Positioned(
-          top: -20, // Adjust this value to position the NIROG button correctly
-          child: GestureDetector(
-            onTap: () {
-              print('NIROG tapped');
-              // Add your NIROG button action here
-              // For example, navigate to a NIROG specific page or show a dialog
-            },
-            child: Column(
-              children: [
-                Image.asset(
-                  'assets/homescreen/nirog.png', // Ensure this asset exists
+          top: -20,
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  print('NIROG tapped');
+                  // Add your NIROG button action here
+                },
+                child: Image.asset(
+                  'assets/homescreen/nirog.png',
                   width: 51,
                   height: 54,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],

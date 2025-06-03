@@ -414,7 +414,6 @@ class _FilterSheetState extends State<FilterSheet> {
                 final isSelected = currentFilter.selectedLanguages.contains(
                   index,
                 );
-
                 return FilterChip(
                   label: Text(language),
                   selected: isSelected,
@@ -461,7 +460,6 @@ class _FilterSheetState extends State<FilterSheet> {
                   final index = entry.key;
                   final gender = entry.value;
                   final isSelected = currentFilter.gender == index;
-
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() => currentFilter.gender = index),
@@ -512,20 +510,86 @@ class _FilterSheetState extends State<FilterSheet> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildDateButton()),
-            const SizedBox(width: 12),
+            // Date section
             Expanded(
-              child: Row(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildTimePicker(true)),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      'to',
-                      style: TextStyle(fontWeight: FontWeight.w500),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDateField(
+                          'Day',
+                          currentFilter.selectedDate?.day ?? DateTime.now().day,
+                          1,
+                          31,
+                          (value) {
+                            if (currentFilter.selectedDate != null) {
+                              setState(() {
+                                currentFilter.selectedDate = DateTime(
+                                  currentFilter.selectedDate!.year,
+                                  currentFilter.selectedDate!.month,
+                                  value,
+                                );
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildDateField(
+                          'Month',
+                          currentFilter.selectedDate?.month ??
+                              DateTime.now().month,
+                          1,
+                          12,
+                          (value) {
+                            if (currentFilter.selectedDate != null) {
+                              setState(() {
+                                currentFilter.selectedDate = DateTime(
+                                  currentFilter.selectedDate!.year,
+                                  value,
+                                  currentFilter.selectedDate!.day,
+                                );
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(child: _buildTimePicker(false)),
+                  const SizedBox(height: 4),
+                  _buildDateField(
+                    '',
+                    currentFilter.selectedDate?.year ?? DateTime.now().year,
+                    DateTime.now().year - 10,
+                    DateTime.now().year + 10,
+                    (value) {
+                      if (currentFilter.selectedDate != null) {
+                        setState(() {
+                          currentFilter.selectedDate = DateTime(
+                            value,
+                            currentFilter.selectedDate!.month,
+                            currentFilter.selectedDate!.day,
+                          );
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Time section - now in the same row level as date fields
+            Expanded(
+              flex: 2,
+              child: Column(
+                children: [
+                  _buildTimeField('From', currentFilter.timeFrom),
+                  const SizedBox(height: 8),
+                  _buildTimeField('To', currentFilter.timeTo),
                 ],
               ),
             ),
@@ -535,60 +599,113 @@ class _FilterSheetState extends State<FilterSheet> {
     );
   }
 
-  Widget _buildDateButton() {
-    return OutlinedButton.icon(
-      onPressed: () async {
-        final date = await showDatePicker(
-          context: context,
-          initialDate: currentFilter.selectedDate ?? DateTime.now(),
-          firstDate: DateTime.now(),
-          lastDate: DateTime.now().add(const Duration(days: 365)),
-        );
-        if (date != null) {
-          setState(() => currentFilter.selectedDate = date);
-        }
-      },
-      icon: const Icon(Icons.calendar_today, size: 16),
-      label: Text(
-        currentFilter.selectedDate != null
-            ? '${currentFilter.selectedDate!.day}/${currentFilter.selectedDate!.month}/${currentFilter.selectedDate!.year}'
-            : 'Select Date',
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.teal,
-        side: const BorderSide(color: Colors.teal),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
+  Widget _buildDateField(
+    String label,
+    int value,
+    int min,
+    int max,
+    Function(int) onChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label.isNotEmpty)
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        if (label.isNotEmpty) const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD3F0ED),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: value,
+              isExpanded: true,
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              items: List.generate(max - min + 1, (index) {
+                final itemValue = min + index;
+                return DropdownMenuItem<int>(
+                  value: itemValue,
+                  child: Text(itemValue.toString().padLeft(2, '0')),
+                );
+              }),
+              onChanged: (newValue) {
+                if (newValue != null) {
+                  onChanged(newValue);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTimePicker(bool isStart) {
-    final time = isStart ? currentFilter.timeFrom : currentFilter.timeTo;
-    return OutlinedButton(
-      onPressed: () async {
-        final picked = await showTimePicker(
-          context: context,
-          initialTime: time ?? TimeOfDay.now(),
-        );
-        if (picked != null) {
-          setState(() {
-            if (isStart) {
-              currentFilter.timeFrom = picked;
-            } else {
-              currentFilter.timeTo = picked;
+  Widget _buildTimeField(String label, TimeOfDay? time) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: () async {
+            final picked = await showTimePicker(
+              context: context,
+              initialTime: time ?? TimeOfDay.now(),
+            );
+            if (picked != null) {
+              setState(() {
+                if (label == 'From') {
+                  currentFilter.timeFrom = picked;
+                } else {
+                  currentFilter.timeTo = picked;
+                }
+              });
             }
-          });
-        }
-      },
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.teal,
-        side: const BorderSide(color: Colors.teal),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      ),
-      child: Text(
-        time != null ? time.format(context) : '--:--',
-        style: const TextStyle(fontSize: 12),
-      ),
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD3F0ED),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  time?.format(context) ?? '--:--',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -708,6 +825,7 @@ class _DoctorSearchPageState extends State<DoctorSearchPage> {
             bool hasMatchingLanguage = doctorLanguages.any(
               (lang) => filterData.selectedLanguages.contains(lang),
             );
+
             if (!hasMatchingLanguage) {
               return false;
             }

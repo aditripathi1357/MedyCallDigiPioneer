@@ -51,19 +51,19 @@ class _DemographicDataScreenState extends State<DemographicDataScreen> {
   Future<void> _initializeFields() async {
     // Ensure context is available for Provider.of
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _initializeEmail(); // Sets initial email from auth
+      // await _initializeEmail(); // Sets initial email from auth
       await _loadExistingData(); // Loads from provider or local storage
     });
   }
 
-  Future<void> _initializeEmail() async {
-    final currentUserEmail = _userService.getCurrentUserEmail();
-    if (mounted) {
-      setState(() {
-        _email = currentUserEmail ?? _email;
-      });
-    }
-  }
+  // Future<void> _initializeEmail() async {
+  //   final currentUserEmail = _userService.getCurrentUserEmail();
+  //   if (mounted) {
+  //     setState(() {
+  //       _email = currentUserEmail ?? _email;
+  //     });
+  //   }
+  // }
 
   void _populateFieldsFromData(Map<String, dynamic> data) {
     if (!mounted) return;

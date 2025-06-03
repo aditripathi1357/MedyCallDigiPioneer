@@ -25,15 +25,17 @@ class _RescheduledPageState extends State<RescheduledPage> {
     final userProvider = Provider.of<UserProvider>(context);
     final userName = userProvider.user?.name ?? 'Guest';
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: _buildCompactTopBar(userName),
+        toolbarHeight: 0,
+        elevation: 0,
+        backgroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            _buildCompactTopBar(userName),
             const SizedBox(height: 40),
             Text(
               'Your Slot Is Rescheduled...',

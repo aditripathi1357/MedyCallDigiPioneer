@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:medycall/Medyscan/medyscan.dart'; // Assuming these paths are correct
-import 'package:medycall/home/profile/profile.dart'; // Assuming these paths are correct
-import 'package:medycall/home/home_screen.dart'; // Assuming these paths are correct
-import 'package:medycall/History/history.dart'; // Assuming these paths are correct
-import 'package:medycall/Appointment/appointment.dart'; // Assuming these paths are correct
+import 'package:medycall/Medyscan/medyscan.dart';
+import 'package:medycall/home/profile/profile.dart'; // Ensure this path is correct
+import 'package:medycall/home/home_screen.dart'; // Ensure this path is correct
+import 'package:medycall/History/history.dart'; // Ensure this path is correct
+import 'package:medycall/Appointment/appointment.dart'; // Ensure this path is correct
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class LocationChangePage extends StatefulWidget {
   const LocationChangePage({Key? key}) : super(key: key);
@@ -18,10 +20,9 @@ class LocationChangePage extends StatefulWidget {
 }
 
 class _LocationChangePageState extends State<LocationChangePage> {
-  int _selectedIndex =
-      1; // Assuming this is for the bottom nav bar, adjust if needed
+  int _selectedIndex = 1;
   GoogleMapController? _mapController;
-  LatLng _currentPosition = const LatLng(37.422, -122.084); // Default position
+  LatLng _currentPosition = const LatLng(37.422, -122.084);
   bool _isLoading = true;
   bool _showSearchBar = false;
   bool _showManualForm = false;
@@ -35,6 +36,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _stateController = TextEditingController();
   final TextEditingController _pincodeController = TextEditingController();
+
   final _formKey = GlobalKey<FormState>();
 
   Map<String, String> _location = {
@@ -42,13 +44,17 @@ class _LocationChangePageState extends State<LocationChangePage> {
     'city': 'Please wait',
     'state': '',
     'pincode': '',
-    'type': 'Home', // Default type
+    'type': 'Home',
+    'houseNo': '', // Added to store house number locally
+    'street': '', // Added to store street locally
+    'landmark': '', // Added to store landmark locally
   };
   String _selectedLocationType = 'Home';
 
   @override
   void initState() {
     super.initState();
+    _loadSavedLocation();
     _getCurrentLocation();
   }
 
@@ -66,10 +72,60 @@ class _LocationChangePageState extends State<LocationChangePage> {
     super.dispose();
   }
 
+  Future<void> _saveLocationLocally(Map<String, String> location) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final locationString = json.encode(location);
+      await prefs.setString('saved_location', locationString);
+      print('Location saved locally: $location');
+    } catch (e) {
+      print('Error saving location locally: $e');
+    }
+  }
+
+  Future<void> _loadSavedLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final locationString = prefs.getString('saved_location');
+      if (locationString != null) {
+        final savedLocation =
+            json.decode(locationString) as Map<String, dynamic>;
+        final typedLocation = savedLocation.map(
+          (key, value) => MapEntry(key, value.toString()),
+        );
+
+        if (mounted) {
+          setState(() {
+            _location = typedLocation;
+            _selectedLocationType = typedLocation['type'] ?? 'Home';
+
+            // Populate manual form fields if a saved location was loaded
+            _houseNoController.text = typedLocation['houseNo'] ?? '';
+            _streetController.text = typedLocation['street'] ?? '';
+            _landmarkController.text = typedLocation['landmark'] ?? '';
+            _areaController.text = typedLocation['area'] ?? '';
+            _cityController.text = typedLocation['city'] ?? '';
+            _stateController.text = typedLocation['state'] ?? '';
+            _pincodeController.text = typedLocation['pincode'] ?? '';
+          });
+          await _geocodeAddressAndUpdateMap(
+            _location,
+          ); // Use _location directly
+        }
+        print('Location loaded locally: $typedLocation');
+      }
+    } catch (e) {
+      print('Error loading location locally: $e');
+    }
+  }
+
   Future<void> _getCurrentLocation() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (!_isLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
     final status = await Permission.location.request();
     if (status.isGranted) {
       try {
@@ -80,11 +136,12 @@ class _LocationChangePageState extends State<LocationChangePage> {
           position.latitude,
           position.longitude,
         );
-        setState(() {
-          _currentPosition = LatLng(position.latitude, position.longitude);
-        });
+        if (mounted) {
+          setState(() {
+            _currentPosition = LatLng(position.latitude, position.longitude);
+          });
+        }
         if (_mapController != null) {
-          // Await camera animation
           await _mapController!.animateCamera(
             CameraUpdate.newCameraPosition(
               CameraPosition(target: _currentPosition, zoom: 15),
@@ -131,18 +188,24 @@ class _LocationChangePageState extends State<LocationChangePage> {
         Placemark place = placemarks.first;
         setState(() {
           _location = {
-            'area': place.street ?? place.subLocality ?? 'Unknown area',
+            'houseNo': place.subThoroughfare ?? '', // Populate house number
+            'street': place.street ?? '', // Populate street
+            'landmark': '', // Cannot easily reverse geocode landmark
+            'area': place.subLocality ?? place.locality ?? 'Unknown area',
             'city':
                 place.locality ?? place.subAdministrativeArea ?? 'Unknown city',
             'state': place.administrativeArea ?? _location['state'] ?? '',
             'pincode': place.postalCode ?? _location['pincode'] ?? '',
             'type': _location['type'] ?? _selectedLocationType,
           };
-          _streetController.text = place.street ?? '';
-          _areaController.text = place.subLocality ?? place.locality ?? '';
-          _cityController.text = place.locality ?? '';
-          _stateController.text = place.administrativeArea ?? '';
-          _pincodeController.text = place.postalCode ?? '';
+          // Pre-fill manual form fields with reverse geocoded data
+          _houseNoController.text = _location['houseNo']!;
+          _streetController.text = _location['street']!;
+          _landmarkController.text = _location['landmark']!;
+          _areaController.text = _location['area']!;
+          _cityController.text = _location['city']!;
+          _stateController.text = _location['state']!;
+          _pincodeController.text = _location['pincode']!;
         });
       } else if (mounted) {
         setState(() {
@@ -169,24 +232,25 @@ class _LocationChangePageState extends State<LocationChangePage> {
     try {
       List<Location> locations = await locationFromAddress(query);
       if (locations.isNotEmpty) {
-        Location searchedLocation =
-            locations.first; // Renamed to avoid conflict
+        Location searchedLocation = locations.first;
         LatLng newPosition = LatLng(
           searchedLocation.latitude,
           searchedLocation.longitude,
         );
+
         if (_mapController != null) {
           await _mapController!.animateCamera(
-            // Await camera animation
             CameraUpdate.newCameraPosition(
               CameraPosition(target: newPosition, zoom: 15),
             ),
           );
         }
+
         await _updateLocationFromCoordinates(
           searchedLocation.latitude,
           searchedLocation.longitude,
         );
+
         if (mounted) {
           setState(() {
             _currentPosition = newPosition;
@@ -222,6 +286,48 @@ class _LocationChangePageState extends State<LocationChangePage> {
     }
   }
 
+  Future<void> _geocodeAddressAndUpdateMap(Map<String, String> address) async {
+    final fullAddress = [
+      address['houseNo'],
+      address['street'],
+      address['landmark'],
+      address['area'],
+      address['city'],
+      address['state'],
+      address['pincode'],
+    ].where((element) => element != null && element.isNotEmpty).join(', ');
+
+    if (fullAddress.isEmpty) return;
+
+    try {
+      List<Location> locations = await locationFromAddress(fullAddress);
+      if (locations.isNotEmpty) {
+        Location geoCodedLocation = locations.first;
+        LatLng newPosition = LatLng(
+          geoCodedLocation.latitude,
+          geoCodedLocation.longitude,
+        );
+
+        if (_mapController != null) {
+          await _mapController!.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(target: newPosition, zoom: 15),
+            ),
+          );
+        }
+        if (mounted) {
+          setState(() {
+            _currentPosition = newPosition;
+          });
+        }
+      } else {
+        print('Geocoding failed for address: $fullAddress');
+      }
+    } catch (e) {
+      print('Error during geocoding for map update: $e');
+    }
+  }
+
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     if (!_isLoading && _mapController != null) {
@@ -234,17 +340,16 @@ class _LocationChangePageState extends State<LocationChangePage> {
   }
 
   void _onCameraMove(CameraPosition position) {
-    // Debounce or limit frequency if this causes performance issues
+    // Optional: Update marker position as map moves
     // setState(() {
     //   _currentPosition = position.target;
     // });
   }
 
+  // Optional: Reverse geocode when map becomes idle after movement
   // void _onCameraIdle() async {
-  //   // Update _currentPosition state first for visual feedback if marker is tied to it
   //   setState(() {
-  //     _currentPosition =
-  //         _mapController?.cameraPosition.target ?? _currentPosition;
+  //     _currentPosition = _mapController?.cameraPosition.target ?? _currentPosition;
   //   });
   //   await _updateLocationFromCoordinates(
   //     _currentPosition.latitude,
@@ -252,28 +357,47 @@ class _LocationChangePageState extends State<LocationChangePage> {
   //   );
   // }
 
-  void _saveLocation() {
+  void _saveLocation() async {
     if (_formKey.currentState!.validate()) {
-      final completeAddress = [
+      final completeAddressParts = [
         _houseNoController.text,
         _streetController.text,
         _landmarkController.text,
         _areaController.text,
-      ].where((element) => element.isNotEmpty).join(', ');
+        _cityController.text,
+        _stateController.text,
+        _pincodeController.text,
+      ].where((element) => element.isNotEmpty);
+
+      final completeAddress = completeAddressParts.join(', ');
 
       final Map<String, String> savedLocation = {
-        'area':
-            completeAddress.isNotEmpty ? completeAddress : _areaController.text,
+        'houseNo': _houseNoController.text,
+        'street': _streetController.text,
+        'landmark': _landmarkController.text,
+        'area': _areaController.text,
         'city': _cityController.text,
         'state': _stateController.text,
         'pincode': _pincodeController.text,
         'type': _selectedLocationType,
+        'fullAddress': completeAddress,
       };
-      // Update the main _location state before popping
+
       setState(() {
         _location = savedLocation;
       });
-      Navigator.pop(context, _location);
+
+      await _geocodeAddressAndUpdateMap(
+        _location,
+      ); // Use _location to update map
+
+      await _saveLocationLocally(_location);
+
+      setState(() {
+        _showManualForm = false;
+      });
+
+      // Navigator.pop(context, _location); // Consider if you want to pop automatically
     }
   }
 
@@ -285,7 +409,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
         title:
@@ -302,7 +426,31 @@ class _LocationChangePageState extends State<LocationChangePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _location['area'] ?? 'Unknown Area',
+                      // Display the combined address for the app bar
+                      [
+                                _location['houseNo'],
+                                _location['street'],
+                                _location['landmark'],
+                                _location['area'],
+                              ]
+                              .where(
+                                (element) =>
+                                    element != null && element.isNotEmpty,
+                              )
+                              .join(', ')
+                              .isNotEmpty
+                          ? [
+                                _location['houseNo'],
+                                _location['street'],
+                                _location['landmark'],
+                                _location['area'],
+                              ]
+                              .where(
+                                (element) =>
+                                    element != null && element.isNotEmpty,
+                              )
+                              .join(', ')
+                          : 'Unknown Area',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -327,14 +475,11 @@ class _LocationChangePageState extends State<LocationChangePage> {
         centerTitle: false,
       ),
       body: Stack(
-        // Use Stack for overlaying the manual form
         children: [
-          // Main content (Map, buttons)
           Column(
             children: [
-              // Map Section
               Container(
-                height: 300, // Adjust as needed, or make it flexible
+                height: 300,
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -352,9 +497,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      _isLoading &&
-                              _mapController ==
-                                  null // Show progress only if map not yet initialized
+                      _isLoading && _mapController == null
                           ? const Center(child: CircularProgressIndicator())
                           : GoogleMap(
                             onMapCreated: _onMapCreated,
@@ -370,10 +513,18 @@ class _LocationChangePageState extends State<LocationChangePage> {
                             onCameraMove: _onCameraMove,
                             // onCameraIdle: _onCameraIdle,
                           ),
-                      const Icon(
-                        Icons.location_pin,
-                        color: Color(0xFF00796B),
-                        size: 40,
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: Icon(
+                            Icons.location_pin,
+                            color: const Color(0xFF00796B),
+                            size: 40,
+                          ),
+                        ),
                       ),
                       if (_showSearchBar)
                         Positioned(
@@ -412,7 +563,6 @@ class _LocationChangePageState extends State<LocationChangePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Manual Location Form Toggle
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -445,8 +595,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
                   ],
                 ),
               ),
-              const Spacer(), // Pushes the button to the bottom if content is less
-              // "Use Current Location" button, only if manual form is not shown
+              const Spacer(),
               if (!_showManualForm)
                 Container(
                   width: double.infinity,
@@ -456,8 +605,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
                       setState(() {
                         _isLoading = true;
                       });
-                      await _getCurrentLocation(); // This updates _location and _isLoading
-
+                      await _getCurrentLocation();
                       if (mounted) {
                         final area = _location['area'];
                         final city = _location['city'];
@@ -480,9 +628,10 @@ class _LocationChangePageState extends State<LocationChangePage> {
                             city.isNotEmpty;
 
                         if (hasValidArea && hasValidCity) {
+                          await _saveLocationLocally(_location);
+                          // Pass the location when navigating back
                           Navigator.pop(context, _location);
                         } else if (!_isLoading) {
-                          // Only show snackbar if not still loading (e.g. error in _getCurrentLocation resolved)
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -493,7 +642,6 @@ class _LocationChangePageState extends State<LocationChangePage> {
                             ),
                           );
                         }
-                        // Ensure isLoading is false if we are not popping and _getCurrentLocation might not have set it.
                         if (mounted && _isLoading) {
                           setState(() {
                             _isLoading = false;
@@ -518,12 +666,9 @@ class _LocationChangePageState extends State<LocationChangePage> {
                     ),
                   ),
                 ),
-              // Bottom padding to ensure button is above bottom nav bar if it's very tall
               SizedBox(height: _showManualForm ? 0 : 16),
             ],
           ),
-
-          // Manual Form Overlay
           if (_showManualForm)
             Positioned.fill(
               child: Container(
@@ -531,21 +676,16 @@ class _LocationChangePageState extends State<LocationChangePage> {
                 child: Center(
                   child: Container(
                     margin: const EdgeInsets.all(20),
-                    height:
-                        MediaQuery.of(context).size.height *
-                        0.85, // Adjusted height
-                    constraints: const BoxConstraints(
-                      maxWidth: 500,
-                    ), // Max width for larger screens
+                    height: MediaQuery.of(context).size.height * 0.85,
+                    constraints: const BoxConstraints(maxWidth: 500),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       children: [
-                        // Header with close button
                         Container(
-                          padding: const EdgeInsets.all(16), // Reduced padding
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             border: Border(
                               bottom: BorderSide(color: Colors.grey[300]!),
@@ -573,15 +713,9 @@ class _LocationChangePageState extends State<LocationChangePage> {
                             ],
                           ),
                         ),
-                        // Form content
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              16,
-                              8,
-                              16,
-                              16,
-                            ), // Adjusted padding
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                             child: _buildManualLocationForm(),
                           ),
                         ),
@@ -670,7 +804,6 @@ class _LocationChangePageState extends State<LocationChangePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location Type Selection
           Text(
             'Location Type',
             style: GoogleFonts.poppins(
@@ -691,7 +824,6 @@ class _LocationChangePageState extends State<LocationChangePage> {
                         selected: _selectedLocationType == type,
                         onSelected: (selected) {
                           if (selected) {
-                            // Ensure onSelected is only called when selected is true
                             setState(() {
                               _selectedLocationType = type;
                             });
@@ -703,7 +835,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
                           color:
                               _selectedLocationType == type
                                   ? const Color(0xFF00796B)
-                                  : Colors.grey[700], // Darker for unselected
+                                  : Colors.grey[700],
                           fontWeight: FontWeight.w500,
                         ),
                         shape: RoundedRectangleBorder(
@@ -813,7 +945,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
               ),
             ),
           ),
-          const SizedBox(height: 10), // Space before save button
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -889,8 +1021,8 @@ class _LocationChangePageState extends State<LocationChangePage> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.red),
             ),
-            filled: true, // Add a subtle background
-            fillColor: Colors.white, // Or Colors.grey[100]
+            filled: true,
+            fillColor: Colors.white,
           ),
         ),
         const SizedBox(height: 12),
@@ -898,17 +1030,13 @@ class _LocationChangePageState extends State<LocationChangePage> {
     );
   }
 
-  // buildLocationWidget is removed as its content is now in AppBar
-
   Widget _buildBottomNavigationBar() {
-    // Assuming your asset paths are correct and exist in pubspec.yaml
-    // Using placeholder icons if assets are not available for this example
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
         Container(
-          height: 80, // Increased height to accommodate labels better if needed
+          height: 80,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -963,7 +1091,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
                 label: 'Appointment',
               ),
               const BottomNavigationBarItem(
-                icon: SizedBox(width: 24, height: 24), // Placeholder for NIROG
+                icon: SizedBox(width: 24, height: 24),
                 label: 'NIROG',
               ),
               BottomNavigationBarItem(
@@ -988,7 +1116,7 @@ class _LocationChangePageState extends State<LocationChangePage> {
               ),
               BottomNavigationBarItem(
                 icon: Image.asset(
-                  'assets/homescreen/medyscan.png', // Corrected from profile to medyscan
+                  'assets/homescreen/medyscan.png',
                   width: 24,
                   height: 24,
                   color:
@@ -1014,53 +1142,54 @@ class _LocationChangePageState extends State<LocationChangePage> {
             type: BottomNavigationBarType.fixed,
             selectedLabelStyle: GoogleFonts.poppins(
               fontSize: 10,
-              fontWeight: FontWeight.w500, // Slightly bolder for selected
+              fontWeight: FontWeight.w500,
             ),
             unselectedLabelStyle: GoogleFonts.poppins(
               fontSize: 10,
               fontWeight: FontWeight.w400,
             ),
-            backgroundColor: Colors.white, // Explicitly set
-            elevation: 0, // Handled by the container's shadow
+            backgroundColor: Colors.white,
+            elevation: 0,
             onTap: (index) {
               if (index == 2) {
-                // NIROG button (center)
                 print('NIROG tapped - Special Action');
-                // Navigator.push(context, MaterialPageRoute(builder: (context) => NirogPage())); // Example
                 return;
               }
               setState(() {
                 _selectedIndex = index;
               });
-              // Navigate to other screens
+              // Navigate to other screens and pass the location
               switch (index) {
                 case 0:
+                  // Replace with your actual HomeScreen constructor that accepts location
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  ); // Use pushReplacement if it's a main tab
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
                   break;
                 case 1:
                   if (ModalRoute.of(context)?.settings.name != '/appointment') {
-                    // Prevent pushing if already on it
+                    // Replace with your actual AppointmentScreen constructor that accepts location
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const AppointmentScreen(),
-                        settings: RouteSettings(name: '/appointment'),
+                        builder: (context) => AppointmentScreen(),
+                        settings: const RouteSettings(name: '/appointment'),
                       ),
                     );
                   }
                   break;
                 case 3:
+                  // Replace with your actual MedicalHistoryPage constructor that accepts location
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const MedicalHistoryPage(),
+                      builder: (context) => MedicalHistoryPage(),
                     ),
                   );
                   break;
                 case 4:
+                  // Replace with your actual MedyscanPage constructor that accepts location
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => MedyscanPage()),
@@ -1071,32 +1200,21 @@ class _LocationChangePageState extends State<LocationChangePage> {
           ),
         ),
         Positioned(
-          top: -20, // Adjust if necessary based on BottomNavBar height
+          top: -20,
           child: GestureDetector(
             onTap: () {
               print('NIROG Tapped from Stack');
-              // Handle NIROG tap, e.g., navigate or show a dialog
-              // This is the actual tap target for the protruding item
-              // setState(() { _selectedIndex = 2; }); // Optional: select it visually
-              // Navigator.push(context, MaterialPageRoute(builder: (context) => NirogPage())); // Example
             },
             child: Container(
-              // Added container for better tap area and potential styling
-              padding: const EdgeInsets.all(
-                4.0,
-              ), // Add padding if image is too small
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                // color: Colors.white, // Optional: if you want a background behind the image
-                // boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 1)]
-              ),
+              padding: const EdgeInsets.all(4.0),
+              decoration: const BoxDecoration(shape: BoxShape.circle),
               child: Image.asset(
                 'assets/homescreen/nirog.png',
                 width: 51,
-                height: 54, // Ensure aspect ratio is good
+                height: 54,
                 fit: BoxFit.contain,
                 errorBuilder:
-                    (context, error, stackTrace) => CircleAvatar(
+                    (context, error, stackTrace) => const CircleAvatar(
                       radius: 28,
                       backgroundColor: Color(0xFF00796B),
                       child: Icon(

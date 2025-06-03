@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:medycall/Medyscan/medyscan.dart';
 import 'package:medycall/articles.dart';
 import 'package:medycall/home/Payment/coupon.dart';
+import 'package:medycall/home/Speciality/DoctorProfile.dart';
 import 'package:medycall/home/filter.dart';
 import 'package:medycall/home/menu/diet.dart';
 import 'package:medycall/home/menu/waterintake.dart';
@@ -739,7 +740,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             IconButton(
               onPressed: () {
-                // Handle filter button tap
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder:
+                      (context) => FilterSheet(
+                        initialFilterData: filterData,
+                        onApplyFilters: _onFilterApplied,
+                      ),
+                );
               },
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(
@@ -904,7 +918,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 90,
                 height: 30,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => DoctorProfileScreen(
+                              doctorName: doctorName,
+                              doctorSpecialty: specialty,
+                              consultationType: type,
+                            ),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF086861),
                     padding: const EdgeInsets.symmetric(
@@ -938,7 +964,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Inside your existing Widget class (e.g., _MyExistingPageState or MyExistingPage)
 
-  // --- Add this _buildDoctorCard method ---
   Widget _buildDoctorCard(
     BuildContext context,
     Doctor doctor,
@@ -1040,7 +1065,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () {
-                              print('Book Now: ${doctor.name}');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => DoctorProfileScreen(
+                                        doctorName: doctor.name,
+                                        doctorSpecialty: doctor.specialization,
+                                        consultationType:
+                                            'General', // You can modify this based on your needs
+                                      ),
+                                ),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
@@ -1067,7 +1103,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () {
-                              print('Know More: ${doctor.name}');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => DoctorProfileScreen(
+                                        doctorName: doctor.name,
+                                        doctorSpecialty: doctor.specialization,
+                                        consultationType:
+                                            'General', // You can modify this based on your needs
+                                      ),
+                                ),
+                              );
                             },
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(
@@ -1121,7 +1168,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Add this as a state variable in your StatefulWidget class
+  // Keep your existing favorite doctors list
   List<Doctor> _favoriteDoctors = [
     Doctor(
       name: 'Dr. Anya Sharma',
@@ -1145,7 +1192,6 @@ class _HomeScreenState extends State<HomeScreen> {
       imagePath: 'assets/ladiesdoctor.png',
     ),
   ];
-
   // Add this method to remove top card
   void _removeTopCard() {
     if (_favoriteDoctors.isNotEmpty) {
@@ -1235,7 +1281,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             IconButton(
               onPressed: () {
-                // Handle filter button tap
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder:
+                      (context) => FilterSheet(
+                        initialFilterData: filterData,
+                        onApplyFilters: _onFilterApplied,
+                      ),
+                );
               },
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(

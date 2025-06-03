@@ -79,7 +79,7 @@ class _SignUpNumberState extends State<Signupnumber> {
           setState(() {
             _isLoading = false;
           });
-          // Navigate to OTP verification screen
+          // Navigate to OTP verification screen and pass the user's name
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -87,6 +87,8 @@ class _SignUpNumberState extends State<Signupnumber> {
                   (context) => OtpNumber(
                     phoneNumber: phoneNumber,
                     verificationId: verificationId,
+                    userName:
+                        _nameController.text.trim(), // Pass the user's name
                   ),
             ),
           );
